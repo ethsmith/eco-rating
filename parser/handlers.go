@@ -33,11 +33,11 @@ func (d *DemoParser) registerHandlers() {
 		if d.state.IsKnifeRound || !d.state.MatchStarted {
 			return
 		}
-		
+
 		planter := d.state.ensurePlayer(e.Player)
 		roundStats := d.state.ensureRound(e.Player)
 		roundStats.PlantedBomb = true
-		
+
 		d.logger.LogBombPlant(d.state.RoundNumber, planter.Name)
 	})
 
@@ -46,11 +46,11 @@ func (d *DemoParser) registerHandlers() {
 		if d.state.IsKnifeRound || !d.state.MatchStarted {
 			return
 		}
-		
+
 		defuser := d.state.ensurePlayer(e.Player)
 		roundStats := d.state.ensureRound(e.Player)
 		roundStats.DefusedBomb = true
-		
+
 		d.logger.LogBombDefuse(d.state.RoundNumber, defuser.Name)
 	})
 
@@ -59,7 +59,7 @@ func (d *DemoParser) registerHandlers() {
 		if d.state.IsKnifeRound || !d.state.MatchStarted {
 			return
 		}
-		
+
 		if e.Attacker != nil && e.Player != nil && e.Attacker.Team != e.Player.Team {
 			roundStats := d.state.ensureRound(e.Attacker)
 			roundStats.FlashAssists++
@@ -89,7 +89,7 @@ func (d *DemoParser) registerHandlers() {
 
 		// Track round start time and determine current side
 		d.state.RoundStartTime = float64(d.parser.CurrentFrame()) / 64.0 // Convert ticks to seconds (64 tick rate)
-		
+
 		// Determine current side based on first T player (for perspective)
 		for _, p := range participants {
 			if p.Team == common.TeamTerrorists {
@@ -194,6 +194,13 @@ func (d *DemoParser) registerHandlers() {
 		attacker.RoundImpact += killValue
 		attacker.EconImpact += killValue
 
+		// Track AWP kills
+		if e.Weapon != nil && e.Weapon.Type == common.EqAWP {
+			round.AWPKills++
+			attacker.AWPKills++
+			d.logger.LogKill(d.state.RoundNumber, a.Name, v.Name, attackerEquip, victimEquip, killValue)
+		}
+
 		// Track death penalty for victim
 		victim.EcoDeathValue += deathPenalty
 
@@ -205,20 +212,20 @@ func (d *DemoParser) registerHandlers() {
 			d.state.RoundHasKill = true
 			d.logger.LogOpeningKill(d.state.RoundNumber, a.Name, v.Name)
 		}
-		
+
 		// Track if victim got opening death
 		victimRound := d.state.ensureRound(v)
 		if !d.state.RoundHasKill {
 			victimRound.OpeningDeath = true
 		}
-		
+
 		// Track trade kills
 		if recent, ok := d.state.RecentKills[v.SteamID64]; ok {
 			if recent.VictimTeam == a.Team && currentTick-recent.Tick <= tradeWindow {
 				round.TradeKill = true
 			}
 		}
-		
+
 		// Track eco/anti-eco kills
 		equipRatio := float64(victimEquip) / math.Max(float64(attackerEquip), 500.0)
 		if equipRatio > 2.0 {
@@ -279,6 +286,11 @@ func (d *DemoParser) registerHandlers() {
 				player.MultiKills[roundStats.Kills]++
 				d.logger.LogMultiKill(d.state.RoundNumber, player.Name, roundStats.Kills)
 			}
+
+			// Calculate AWP kills per round at round end
+			if player.RoundsPlayed > 0 {
+				player.AWPKillsPerRound = float64(player.AWPKills) / float64(player.RoundsPlayed)
+			}
 		}
 
 		// Track survival and round outcome for players
@@ -303,11 +315,11 @@ func (d *DemoParser) registerHandlers() {
 		// Detect clutch situations and track clutch performance
 		for _, p := range gs.Participants().Playing() {
 			round := d.state.ensureRound(p)
-			
+
 			// Count alive teammates and enemies
 			aliveTeammates := 0
 			aliveEnemies := 0
-			
+
 			for _, other := range gs.Participants().Playing() {
 				if other.IsAlive() {
 					if other.Team == p.Team {
@@ -317,22 +329,22 @@ func (d *DemoParser) registerHandlers() {
 					}
 				}
 			}
-			
+
 			// Clutch situation: player is last alive on their team
 			if p.IsAlive() && aliveTeammates == 1 && aliveEnemies > 0 {
 				round.ClutchAttempt = true
 				round.ClutchKills = round.Kills // Kills made during clutch
-				
+
 				if round.TeamWon {
 					round.ClutchWon = true
 					ps := d.state.ensurePlayer(p)
 					ps.ClutchWins++
 				}
-				
+
 				ps := d.state.ensurePlayer(p)
 				ps.ClutchRounds++
 			}
-			
+
 			// Track weapon saves (survived a lost round)
 			if p.IsAlive() && !round.TeamWon {
 				round.SavedWeapons = true
@@ -341,12 +353,12 @@ func (d *DemoParser) registerHandlers() {
 
 		// Calculate Advanced Round Swing for each player
 		// Create round context for situational awareness
-		currentTime := float64(d.parser.CurrentFrame()) / 64.0 // Convert ticks to seconds
+		currentTime := float64(d.parser.CurrentFrame()) / 64.0                     // Convert ticks to seconds
 		timeRemaining := math.Max(0.0, 115.0-(currentTime-d.state.RoundStartTime)) // 115s round time
-		
+
 		roundContext := &model.RoundContext{
 			RoundNumber:     d.state.RoundNumber,
-			TotalPlayers:    10, // Standard 5v5
+			TotalPlayers:    10,    // Standard 5v5
 			BombPlanted:     false, // Will be updated based on round stats
 			BombDefused:     false, // Will be updated based on round stats
 			RoundType:       determineRoundType(d.state.RoundNumber),
@@ -377,12 +389,12 @@ func (d *DemoParser) registerHandlers() {
 			// Calculate actual player and team equipment values
 			var playerEquipValue float64
 			var teamEquipValue float64
-			
+
 			// Find the actual player in game state to get equipment value
 			for _, p := range gs.Participants().Playing() {
 				if p.SteamID64 == steamID {
 					playerEquipValue = float64(p.EquipmentValueCurrent())
-					
+
 					// Calculate team equipment value
 					teamTotal := 0
 					teamCount := 0
@@ -398,7 +410,7 @@ func (d *DemoParser) registerHandlers() {
 					break
 				}
 			}
-			
+
 			// Fallback values if player not found
 			if playerEquipValue == 0 {
 				playerEquipValue = 3000.0

@@ -12,7 +12,7 @@ func main() {
 	//	log.Fatal("Usage: cs2-rating <demo.dem>")
 	//}
 
-	demo, err := os.Open("C:\\Program Files (x86)\\Steam\\steamapps\\common\\Counter-Strike Global Offensive\\game\\csgo\\replays\\match730_003795643948026822985_1027935699_410.dem")
+	demo, err := os.Open("C:\\Users\\ethan\\Downloads\\combine-contender-mid6675-0_de_inferno-2026-01-06_02-42-14.dem\\demos\\combine-contender-mid6675-0_de_inferno-2026-01-06_02-42-14.dem")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -15,6 +15,10 @@ type PlayerStats struct {
 	TradeDenials int
 	TradedDeaths int
 
+	// AWP specific stats
+	AWPKills         int
+	AWPKillsPerRound float64
+
 	MultiKills [6]int // index = kills in round
 
 	RoundImpact float64
@@ -27,10 +31,10 @@ type PlayerStats struct {
 	EcoDeathValue float64 // Sum of eco-adjusted death penalties
 
 	// Round Swing - measures contribution to round wins/losses
-	RoundSwing    float64 // Cumulative round swing score
-	RoundsWon     int     // Rounds where player's team won
-	ClutchRounds  int     // Rounds where player was last alive
-	ClutchWins    int     // Clutch rounds won
+	RoundSwing   float64 // Cumulative round swing score
+	RoundsWon    int     // Rounds where player's team won
+	ClutchRounds int     // Rounds where player was last alive
+	ClutchWins   int     // Clutch rounds won
 
 	FinalRating float64
 }
