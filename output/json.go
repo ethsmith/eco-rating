@@ -1,4 +1,4 @@
-﻿package output
+package output
 
 import (
 	"encoding/json"
@@ -14,5 +14,19 @@ func Export(players map[uint64]*model.PlayerStats, path string) error {
 	}
 	defer file.Close()
 
-	return json.NewEncoder(file).Encode(players)
+	enc := json.NewEncoder(file)
+	enc.SetIndent("", "  ")
+	return enc.Encode(players)
+}
+
+func ExportAggregated(players map[string]*AggregatedStats, path string) error {
+	file, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	enc := json.NewEncoder(file)
+	enc.SetIndent("", "  ")
+	return enc.Encode(players)
 }

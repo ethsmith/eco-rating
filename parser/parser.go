@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"eco-rating/model"
 	"eco-rating/output"
 	"eco-rating/rating"
 	"io"
@@ -81,4 +82,9 @@ func (d *DemoParser) Parse() {
 
 func (d *DemoParser) ExportJSON(path string) error {
 	return output.Export(d.state.Players, path)
+}
+
+// GetPlayers returns the parsed player stats map
+func (d *DemoParser) GetPlayers() map[uint64]*model.PlayerStats {
+	return d.state.Players
 }

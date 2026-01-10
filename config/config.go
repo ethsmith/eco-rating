@@ -1,0 +1,97 @@
+package config
+
+import (
+	"encoding/json"
+	"os"
+)
+
+type Config struct {
+	// Cumulative mode - when true, fetches all demos from specified tier across all combine days
+	Cumulative bool `json:"cumulative"`
+
+	// Tier to filter demos by (e.g., "contender", "challenger", "elite", "premier", "prospect", "recruit")
+	Tier string `json:"tier"`
+
+	// Base URL for the S3 bucket
+	BaseURL string `json:"base_url"`
+
+	// Prefix for the combines folder (e.g., "s19/Combines/")
+	Prefix string `json:"prefix"`
+
+	// Output directory for downloaded demos
+	OutputDir string `json:"output_dir"`
+
+	// Path to a single demo file (used when cumulative=false)
+	DemoPath string `json:"demo_path"`
+
+	// Enable logging during parsing
+	EnableLogging bool `json:"enable_logging"`
+}
+
+// DefaultConfig returns a config with sensible defaults
+func DefaultConfig() *Config {
+	return &Config{
+		Cumulative:    false,
+		Tier:          "",
+		BaseURL:       "https://cscdemos.nyc3.digitaloceanspaces.com/",
+		Prefix:        "s19/Combines/",
+		OutputDir:     "./demos",
+		DemoPath:      "",
+		EnableLogging: true,
+	}
+}
+
+// LoadConfig loads configuration from a JSON file
+func LoadConfig(path string) (*Config, error) {
+	cfg := DefaultConfig()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return cfg, nil
+		}
+		return nil, err
+	}
+
+	if err := json.Unmarshal(data, cfg); err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+// SaveConfig saves the configuration to a JSON file
+func SaveConfig(cfg *Config, path string) error {
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
+// ValidTiers returns the list of valid tier names
+func ValidTiers() []string {
+	return []string{
+		"challenger",
+		"contender",
+		"elite",
+		"premier",
+		"prospect",
+		"recruit",
+	}
+}
+
+// IsValidTier checks if the given tier is valid
+func IsValidTier(tier string) bool {
+	for _, t := range ValidTiers() {
+		if t == tier {
+			return true
+		}
+	}
+	return false
+}
+
+// DemoPrefix returns the prefix used to filter demo files for a given tier
+func DemoPrefix(tier string) string {
+	return "combine-" + tier
+}

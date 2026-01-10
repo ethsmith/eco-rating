@@ -1,0 +1,9 @@
+{
+  "cumulative": true,
+  "tier": "contender",
+  "base_url": "https://cscdemos.nyc3.digitaloceanspaces.com/",
+  "prefix": "s19/Combines/",
+  "output_dir": "./demos",
+  "demo_path": "",
+  "enable_logging": true
+}

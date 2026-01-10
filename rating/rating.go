@@ -79,7 +79,7 @@ func ComputeFinalRating(p *model.PlayerStats) float64 {
 	// Advanced round swing system - adjust scaling for new range
 	avgSwing := p.RoundSwing / rounds
 	var swingRating float64
-	
+
 	// New scaling for advanced round swing (range roughly -0.25 to +0.35 per round)
 	if avgSwing >= 0.05 {
 		// High positive swing: moderate reward (scaled down)
@@ -96,13 +96,14 @@ func ComputeFinalRating(p *model.PlayerStats) float64 {
 	// === Component 5: Multi-Kill Rating (12%) ===
 	// Separate component for explosive moments - but penalize if overall performance is poor
 	multiKillBonus := float64(sumMulti(p.MultiKills)) / rounds
-	multiKillRating := math.Min(math.Pow(multiKillBonus/BaselineMultiKill, 0.8), 3.0)
-	
-	// Reduce multi-kill bonus for players with poor overall stats
-	overallPerformance := (ecoKPR/BaselineKPR + (adr/BaselineADR) + p.KAST/BaselineKAST) / 3.0
-	if overallPerformance < 0.9 && multiKillRating > 1.0 {
-		// Reduce multi-kill bonus for below-average players
-		multiKillRating = 1.0 + (multiKillRating-1.0)*0.6
+	multiKillRating := math.Min(math.Pow(multiKillBonus/BaselineMultiKill, 0.8), 2.0)
+
+	// Sliding scale: multi-kill bonus proportional to overall performance
+	// Prevents stat padding through occasional explosive rounds while rewarding clutch moments proportionally
+	overallPerformance := (ecoKPR/BaselineKPR + (adr / BaselineADR) + p.KAST/BaselineKAST) / 3.0
+	if multiKillRating > 1.0 {
+		penaltyFactor := math.Pow(math.Min(1.0, overallPerformance), 2)
+		multiKillRating = 1.0 + (multiKillRating-1.0)*penaltyFactor
 	}
 
 	// === Component 6: KAST Rating (8%) ===
