@@ -261,8 +261,16 @@ func (g *Generator) generateHeatmap(demoPathArg string, steamID string, outputFi
 
 	cmd := exec.Command(g.NodePath, args...)
 	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		errMsg := strings.TrimSpace(stderr.String())
+		if errMsg != "" {
+			return fmt.Errorf("%w|%s", err, errMsg)
+		}
+		return err
+	}
+	return nil
 }
 
 var invalidPathChars = regexp.MustCompile(`[<>:"/\\|?*\x00-\x1F]`)

@@ -82,11 +82,14 @@ func main() {
 		if cfg.Tier == "" {
 			log.Fatal("Tier must be specified in cumulative mode (use -tier flag or set in config)")
 		}
-		if !config.IsValidTier(cfg.Tier) {
-			log.Fatalf("Invalid tier '%s'. Valid tiers: %v", cfg.Tier, config.ValidTiers())
+		tiers := config.ParseTiers(cfg.Tier)
+		for _, t := range tiers {
+			if !config.IsValidTier(t) {
+				log.Fatalf("Invalid tier '%s'. Valid tiers: %v", t, config.ValidTiers())
+			}
 		}
 
-		runCumulativeMode(cfg, cfg.EnableCsdm, *csdmCliPath, *csdmForceAnalyze)
+		runCumulativeModeMultiTier(cfg, tiers, cfg.EnableCsdm, *csdmCliPath, *csdmForceAnalyze)
 		return
 	}
 
@@ -110,61 +113,120 @@ type ParseResult struct {
 	DemoKey string
 	Players map[uint64]*model.PlayerStats
 	MapName string
+	Tier    string
 	Logs    string
 	Error   error
 }
 
-func runCumulativeMode(cfg *config.Config, generateHeatmaps bool, csdmCliPath string, csdmForceAnalyze bool) {
-	log.Printf("Running in cumulative mode for tier: %s", cfg.Tier)
+type downloadedDemo struct {
+	Key  string
+	Path string
+}
+
+func runCumulativeModeMultiTier(cfg *config.Config, tiers []string, generateHeatmaps bool, csdmCliPath string, csdmForceAnalyze bool) {
+	log.Printf("Running in cumulative mode for tiers: %v", tiers)
 
 	// Create bucket client
 	client := bucket.NewClient(cfg.BaseURL)
 
-	// Get all demos for the tier
-	log.Printf("Fetching demo list from %s%s...", cfg.BaseURL, cfg.Prefix)
-	demos, err := client.GetAllDemosByTier(cfg.Prefix, cfg.Tier)
-	if err != nil {
-		log.Fatalf("Failed to get demos: %v", err)
-	}
-
-	log.Printf("Found %d demos for tier '%s'", len(demos), cfg.Tier)
-
 	// Create downloader
 	dl := downloader.NewDownloader(cfg.OutputDir)
 
-	// Download all demos first (sequential to avoid overwhelming the server)
-	type downloadedDemo struct {
-		Key  string
-		Path string
-	}
-	var downloadedDemos []downloadedDemo
+	// Shared aggregator across all tiers
+	aggregator := output.NewAggregator()
 
-	log.Printf("Downloading demos...")
-	for i, demo := range demos {
-		log.Printf("[%d/%d] Downloading: %s", i+1, len(demos), demo.Key)
+	// Track demos by map and by player for heatmap generation.
+	playerNameBySteamID := make(map[string]string)
+	demoPathsBySteamIDByMap := make(map[string]map[string][]string)
+	var allDownloadedDemos []downloadedDemo
 
-		url := client.GetDownloadURL(demo.Key)
-		demoPath, err := dl.DownloadAndExtract(url)
+	for _, tier := range tiers {
+		log.Printf("\n=== Processing tier: %s ===", tier)
+
+		// Get all demos for this tier
+		log.Printf("Fetching demo list from %s%s...", cfg.BaseURL, cfg.Prefix)
+		demos, err := client.GetAllDemosByTier(cfg.Prefix, tier)
 		if err != nil {
-			log.Printf("  Error downloading: %v", err)
+			log.Printf("Failed to get demos for tier %s: %v", tier, err)
 			continue
 		}
 
-		downloadedDemos = append(downloadedDemos, downloadedDemo{Key: demo.Key, Path: demoPath})
+		log.Printf("Found %d demos for tier '%s'", len(demos), tier)
+
+		// Download all demos for this tier
+		var downloadedDemos []downloadedDemo
+
+		log.Printf("Downloading demos...")
+		for i, demo := range demos {
+			log.Printf("[%d/%d] Downloading: %s", i+1, len(demos), demo.Key)
+
+			url := client.GetDownloadURL(demo.Key)
+			demoPath, err := dl.DownloadAndExtract(url)
+			if err != nil {
+				log.Printf("  Error downloading: %v", err)
+				continue
+			}
+
+			downloadedDemos = append(downloadedDemos, downloadedDemo{Key: demo.Key, Path: demoPath})
+		}
+
+		allDownloadedDemos = append(allDownloadedDemos, downloadedDemos...)
+
+		log.Printf("Downloaded %d demos for tier %s, starting parallel parsing...", len(downloadedDemos), tier)
+
+		// Parse demos for this tier and add to aggregator
+		successCount, allLogs := parseDemosToAggregator(cfg, downloadedDemos, aggregator, generateHeatmaps, playerNameBySteamID, demoPathsBySteamIDByMap, tier)
+
+		// Print logs for this tier
+		if len(allLogs) > 0 {
+			log.Printf("\n========== PARSING LOGS (%s) ==========", tier)
+			for _, logOutput := range allLogs {
+				fmt.Println(logOutput)
+			}
+			log.Printf("========== END LOGS ==========\n")
+		}
+
+		log.Printf("Completed processing %d/%d demos for tier %s", successCount, len(downloadedDemos), tier)
 	}
 
-	log.Printf("Downloaded %d demos, starting parallel parsing...", len(downloadedDemos))
+	// Finalize and export aggregated stats across all tiers
+	aggregator.Finalize()
 
-	// Track demos by map and by player for heatmap generation.
-	// demoPathsBySteamIDByMap[steamID][mapName] = []demoPaths
-	playerNameBySteamID := make(map[string]string)
-	demoPathsBySteamIDByMap := make(map[string]map[string][]string)
+	outputPath := "match_rating.json"
+	if err := output.ExportAggregated(aggregator.GetResults(), outputPath); err != nil {
+		log.Fatalf("Failed to export aggregated stats: %v", err)
+	}
+
+	log.Printf("\nAggregated stats for %d players across %d tiers saved to: %s", len(aggregator.GetResults()), len(tiers), outputPath)
+
+	if generateHeatmaps {
+		log.Printf("Generating heatmaps...")
+		g := heatmap.NewGenerator(csdmCliPath)
+		g.Force = csdmForceAnalyze
+
+		allDemoPaths := make([]string, 0, len(allDownloadedDemos))
+		for _, dd := range allDownloadedDemos {
+			allDemoPaths = append(allDemoPaths, dd.Path)
+		}
+		if err := g.AnalyzeDemos(allDemoPaths); err != nil {
+			log.Printf("csdm analyze failed, skipping heatmaps: %v", err)
+			return
+		}
+		if err := g.GeneratePlayerMapHeatmaps(cfg.HeatmapPath, playerNameBySteamID, demoPathsBySteamIDByMap); err != nil {
+			log.Printf("Heatmap generation failed: %v", err)
+		} else {
+			log.Printf("Heatmaps generated in: %s", cfg.HeatmapPath)
+		}
+	}
+}
+
+func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo, aggregator *output.Aggregator, generateHeatmaps bool, playerNameBySteamID map[string]string, demoPathsBySteamIDByMap map[string]map[string][]string, tier string) (int, []string) {
 	var heatmapMu sync.Mutex
 
 	// Set up worker pool for concurrent parsing
 	numWorkers := runtime.NumCPU()
 	if numWorkers > 8 {
-		numWorkers = 8 // Cap at 8 workers to avoid memory issues
+		numWorkers = 8
 	}
 	log.Printf("Using %d parallel workers", numWorkers)
 
@@ -205,6 +267,7 @@ func runCumulativeMode(cfg *config.Config, generateHeatmaps bool, csdmCliPath st
 					DemoKey: job.Key,
 					Players: players,
 					MapName: mapName,
+					Tier:    tier,
 					Logs:    logs,
 					Error:   err,
 				}
@@ -225,7 +288,6 @@ func runCumulativeMode(cfg *config.Config, generateHeatmaps bool, csdmCliPath st
 	}()
 
 	// Collect results
-	aggregator := output.NewAggregator()
 	var allLogs []string
 	successCount := 0
 	processedCount := 0
@@ -237,7 +299,7 @@ func runCumulativeMode(cfg *config.Config, generateHeatmaps bool, csdmCliPath st
 			continue
 		}
 
-		aggregator.AddGame(result.Players, result.MapName)
+		aggregator.AddGame(result.Players, result.MapName, result.Tier)
 		successCount++
 		log.Printf("[%d/%d] Parsed: %s (map: %s, players: %d)", processedCount, len(downloadedDemos), result.DemoKey, result.MapName, len(result.Players))
 
@@ -247,45 +309,7 @@ func runCumulativeMode(cfg *config.Config, generateHeatmaps bool, csdmCliPath st
 		}
 	}
 
-	// Print all collected logs at the end
-	if len(allLogs) > 0 {
-		log.Printf("\n========== PARSING LOGS ==========")
-		for _, logOutput := range allLogs {
-			fmt.Println(logOutput)
-		}
-		log.Printf("========== END LOGS ==========\n")
-	}
-
-	// Finalize and export aggregated stats
-	aggregator.Finalize()
-
-	outputPath := "match_rating.json"
-	if err := output.ExportAggregated(aggregator.GetResults(), outputPath); err != nil {
-		log.Fatalf("Failed to export aggregated stats: %v", err)
-	}
-
-	log.Printf("Completed processing %d/%d demos", successCount, len(downloadedDemos))
-	log.Printf("Aggregated stats for %d players saved to: %s", len(aggregator.GetResults()), outputPath)
-
-	if generateHeatmaps {
-		log.Printf("Generating heatmaps...")
-		g := heatmap.NewGenerator(csdmCliPath)
-		g.Force = csdmForceAnalyze
-
-		allDemoPaths := make([]string, 0, len(downloadedDemos))
-		for _, dd := range downloadedDemos {
-			allDemoPaths = append(allDemoPaths, dd.Path)
-		}
-		if err := g.AnalyzeDemos(allDemoPaths); err != nil {
-			log.Printf("csdm analyze failed, skipping heatmaps: %v", err)
-			return
-		}
-		if err := g.GeneratePlayerMapHeatmaps(cfg.HeatmapPath, playerNameBySteamID, demoPathsBySteamIDByMap); err != nil {
-			log.Printf("Heatmap generation failed: %v", err)
-		} else {
-			log.Printf("Heatmaps generated in: %s", cfg.HeatmapPath)
-		}
-	}
+	return successCount, allLogs
 }
 
 func parseSingleDemo(demoPath string, enableLogging bool) {

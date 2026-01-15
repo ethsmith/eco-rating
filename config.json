@@ -1,6 +1,6 @@
 {
   "cumulative": true,
-  "tier": "contender",
+  "tier": "recruit,prospect,contender",
   "base_url": "https://cscdemos.nyc3.digitaloceanspaces.com/",
   "prefix": "s19/Combines/",
   "output_dir": "D:\\demos",

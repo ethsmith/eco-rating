@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"strings"
 )
 
 type Config struct {
@@ -102,4 +103,20 @@ func IsValidTier(tier string) bool {
 // DemoPrefix returns the prefix used to filter demo files for a given tier
 func DemoPrefix(tier string) string {
 	return "combine-" + tier
+}
+
+// ParseTiers splits a comma-separated tier string into individual tiers
+func ParseTiers(tierStr string) []string {
+	if tierStr == "" {
+		return nil
+	}
+	parts := strings.Split(tierStr, ",")
+	tiers := make([]string, 0, len(parts))
+	for _, p := range parts {
+		t := strings.TrimSpace(p)
+		if t != "" {
+			tiers = append(tiers, t)
+		}
+	}
+	return tiers
 }

@@ -18,6 +18,7 @@ type MultiKillStats struct {
 type AggregatedStats struct {
 	SteamID    string `json:"steam_id"`
 	Name       string `json:"name"`
+	Tier       string `json:"tier"`
 	GamesCount int    `json:"games_count"`
 
 	// Cumulative totals
@@ -225,9 +226,11 @@ func NewAggregator() *Aggregator {
 }
 
 // AddGame adds stats from a single game to the aggregator
-func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName string) {
+func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName string, tier string) {
 	for _, p := range players {
-		agg := a.ensurePlayer(p.SteamID, p.Name)
+		// Key by SteamID+Tier so each player has separate stats per tier
+		key := p.SteamID + ":" + tier
+		agg := a.ensurePlayer(key, p.SteamID, p.Name, tier)
 		agg.GamesCount++
 
 		// Add cumulative stats
@@ -550,16 +553,17 @@ func (a *Aggregator) GetResults() map[string]*AggregatedStats {
 	return a.Players
 }
 
-func (a *Aggregator) ensurePlayer(steamID, name string) *AggregatedStats {
-	if _, ok := a.Players[steamID]; !ok {
-		a.Players[steamID] = &AggregatedStats{
+func (a *Aggregator) ensurePlayer(key, steamID, name, tier string) *AggregatedStats {
+	if _, ok := a.Players[key]; !ok {
+		a.Players[key] = &AggregatedStats{
 			SteamID:        steamID,
 			Name:           name,
+			Tier:           tier,
 			MapRatings:     make(map[string]float64),
 			MapGamesPlayed: make(map[string]int),
 			mapRatingSum:   make(map[string]float64),
 			mapGamesCount:  make(map[string]int),
 		}
 	}
-	return a.Players[steamID]
+	return a.Players[key]
 }
