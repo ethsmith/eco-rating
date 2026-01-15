@@ -1,18 +1,25 @@
 package rating
 
 // === Rating Component Weights ===
-// Based on HLTV Rating 3.0 methodology: 60% output metrics, 40% cost metrics
-// Adjusted for advanced round swing system with new components
+// 60% output metrics, 40% cost metrics
 const (
-	WeightKillRating      = 0.28 // Eco-adjusted kills per round (primary component)
-	WeightDeathRating     = 0.16 // Death penalty
-	WeightADRRating       = 0.18 // Damage per round
-	WeightSwingRating     = 0.10 // Round Swing
-	WeightMultiKillRating = 0.10 // Multi-kill rating (explosive moments)
+	// Output components (60% total)
+	WeightKillRating      = 0.20 // Eco-adjusted kills per round
+	WeightADRRating       = 0.14 // Damage per round
+	WeightMultiKillRating = 0.08 // Multi-kill rating (explosive moments)
 	WeightKASTRating      = 0.06 // Consistency metric
-	WeightOpeningRating   = 0.06 // Opening duel performance
+	WeightOpeningRating   = 0.05 // Opening duel performance
 	WeightTradeRating     = 0.04 // Trade efficiency and team play
 	WeightUtilityRating   = 0.02 // Utility/support impact
+	WeightSwingRating     = 0.01 // Round Swing
+
+	// Cost components (40% total)
+	WeightDeathRating         = 0.12 // Death penalty (base)
+	WeightEcoDeathRating      = 0.10 // Eco-adjusted death value
+	WeightEarlyDeathRating    = 0.08 // Early/opening deaths penalty
+	WeightUntradedDeathRating = 0.05 // Untraded opening deaths
+	WeightTeamFlashRating     = 0.02 // Team flash penalty
+	WeightFailedClutchRating  = 0.03 // Failed clutch penalty
 )
 
 // === Normalization Baselines ===
@@ -32,6 +39,13 @@ const (
 	BaselineUtilityDamage      = 15.0 // Average utility damage per round
 	BaselineFlashAssists       = 0.12 // Average flash assists per round
 	BaselineEnemyFlashDur      = 1.2  // Average enemy flash duration per round (seconds)
+
+	// Cost component baselines
+	BaselineEcoDeathValue     = 0.65 // Average eco death value per round
+	BaselineEarlyDeaths       = 0.08 // Average early deaths per round
+	BaselineUntradedOpenings  = 0.04 // Average untraded opening deaths per round
+	BaselineTeamFlashPerRound = 0.15 // Average team flashes per round
+	BaselineFailedClutchRate  = 0.60 // Average failed clutch rate (1 - win rate)
 )
 
 // === Eco Kill Value Multipliers ===

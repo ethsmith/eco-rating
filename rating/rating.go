@@ -5,214 +5,241 @@ import (
 	"math"
 )
 
-// ComputeFinalRating calculates an HLTV 3.0-style rating
-// Based on HLTV's 60-40 output/cost balance with recent weight adjustments
-// Enhanced with opening duel, trade efficiency, and utility components
+// ComputeFinalRating calculates a rating with 60% output / 40% cost balance
+// Output: kills, ADR, multi-kills, KAST, opening duels, trades, utility, swing
+// Cost: deaths, eco deaths, early deaths, untraded deaths, team flashes, failed clutches
 func ComputeFinalRating(p *model.PlayerStats) float64 {
 	rounds := float64(p.RoundsPlayed)
 	if rounds == 0 {
 		return 0
 	}
 
-	// === Component 1: Kill Rating (28%) ===
-	// Eco-adjusted kills per round - primary component per HLTV updates
+	// ==================== OUTPUT COMPONENTS (60%) ====================
+
+	// === Kill Rating (20%) ===
 	ecoKPR := p.EcoKillValue / rounds
-	// Enhanced scaling for exceptional fraggers
 	killRatio := ecoKPR / BaselineKPR
 	var killRating float64
 	if killRatio >= 1.5 {
-		// Exceptional fraggers: very strong boost
 		killRating = 1.0 + (killRatio-1.0)*1.3
 	} else if killRatio >= 1.2 {
-		// Good fraggers: moderate boost
 		killRating = 1.0 + (killRatio-1.0)*0.7
 	} else if killRatio >= 0.8 {
-		// Average performance: normal scaling
 		killRating = math.Pow(killRatio, 0.9)
 	} else {
-		// Below average: stronger penalty
 		killRating = math.Pow(killRatio, 1.1)
 	}
 
-	// === Component 2: Death Rating (16%) ===
-	// Balanced death penalty - reward low deaths, penalize high deaths
-	dpr := float64(p.Deaths) / rounds
-	deathRatio := dpr / BaselineDPR
-	var deathRating float64
-	if deathRatio <= 0.5 {
-		// Exceptionally low deaths: very strong reward
-		deathRating = 2.0 - (deathRatio * 0.2)
-	} else if deathRatio <= 0.8 {
-		// Very low deaths: strong reward
-		deathRating = 1.7 - (deathRatio * 0.4)
-	} else if deathRatio <= 1.0 {
-		// Below baseline: moderate reward
-		deathRating = 1.4 - (deathRatio * 0.3)
-	} else if deathRatio <= 1.3 {
-		// Above baseline: moderate penalty
-		deathRating = 1.0 / math.Pow(deathRatio, 1.0)
-	} else {
-		// High deaths: stronger penalty
-		deathRating = 1.0 / math.Pow(deathRatio, 1.2)
-	}
-	deathRating = math.Max(0.3, math.Min(1.9, deathRating))
-
-	// === Component 3: ADR Rating (18%) ===
-	// Eco-adjusted damage per round - reward high damage dealers
+	// === ADR Rating (14%) ===
 	adr := float64(p.Damage) / rounds
 	adrRatio := adr / BaselineADR
 	var adrRating float64
 	if adrRatio >= 1.4 {
-		// Exceptional damage: very strong boost
 		adrRating = 0.8 + (adrRatio * 0.6)
 	} else if adrRatio >= 1.0 {
-		// Above baseline: strong scaling for high damage
 		adrRating = 0.7 + (adrRatio * 0.5)
 	} else if adrRatio >= 0.8 {
-		// Below baseline: stronger penalty
 		adrRating = 0.4 + (adrRatio * 0.6)
 	} else {
-		// Low damage: very strong penalty
 		adrRating = 0.3 + (adrRatio * 0.5)
 	}
 
-	// === Component 4: Round Swing Rating (10%) ===
-	// Advanced round swing system
-	avgSwing := p.RoundSwing / rounds
-	var swingRating float64
-	if avgSwing >= 0.05 {
-		// High positive swing: moderate reward
-		swingRating = 1.0 + (avgSwing/0.15)*0.4
-	} else if avgSwing >= 0 {
-		// Low positive swing: small reward
-		swingRating = 1.0 + (avgSwing/0.10)*0.2
-	} else {
-		// Negative swing: penalty
-		swingRating = 1.0 + (avgSwing/0.10)*0.3
-	}
-	swingRating = math.Max(0.6, math.Min(1.4, swingRating))
-
-	// === Component 5: Multi-Kill Rating (10%) ===
-	// Explosive moments - penalize if overall performance is poor
+	// === Multi-Kill Rating (8%) ===
 	multiKillBonus := float64(sumMulti(p.MultiKills)) / rounds
 	multiKillRating := math.Min(math.Pow(multiKillBonus/BaselineMultiKill, 0.8), 2.0)
-
-	// Sliding scale: multi-kill bonus proportional to overall performance
 	overallPerformance := (ecoKPR/BaselineKPR + (adr / BaselineADR) + p.KAST/BaselineKAST) / 3.0
 	if multiKillRating > 1.0 {
 		penaltyFactor := math.Pow(math.Min(1.0, overallPerformance), 2)
 		multiKillRating = 1.0 + (multiKillRating-1.0)*penaltyFactor
 	}
 
-	// === Component 6: KAST Rating (6%) ===
-	// Consistency metric with penalties for low KAST
+	// === KAST Rating (6%) ===
 	kastRatio := p.KAST / BaselineKAST
 	var kastRating float64
 	if kastRatio >= 1.2 {
-		// Very high KAST: diminishing returns
 		kastRating = 1.0 + (kastRatio-1.0)*0.6
 	} else if kastRatio >= 0.9 {
-		// Good KAST: normal scaling
 		kastRating = kastRatio
 	} else {
-		// Low KAST: stronger penalty
 		kastRating = math.Pow(kastRatio, 1.2)
 	}
 
-	// === Component 7: Opening Duel Rating (6%) ===
-	// Measures entry impact - success rate and round conversion
+	// === Opening Duel Rating (5%) ===
 	openingRating := 1.0
 	if p.OpeningAttempts > 0 {
 		successRate := float64(p.OpeningSuccesses) / float64(p.OpeningAttempts)
-		// Normalize against baseline (50% success rate)
 		successRatio := successRate / BaselineOpeningSuccessRate
-
-		// Win conversion after opening kill
 		winConversion := 0.0
 		if p.OpeningSuccesses > 0 {
 			winConversion = float64(p.RoundsWonAfterOpening) / float64(p.OpeningSuccesses)
 		}
-
-		// Combined opening rating: 70% success rate, 30% win conversion
 		openingRating = successRatio*0.7 + winConversion*0.6
 		openingRating = math.Max(0.5, math.Min(1.6, openingRating))
 	}
 
-	// === Component 8: Trade Efficiency Rating (4%) ===
-	// Measures team coordination - trading teammates and being traded
+	// === Trade Efficiency Rating (4%) ===
 	tradeRating := 1.0
-
-	// Reward for trading teammates
 	tradeKillsPerRound := float64(p.TradeKills) / rounds
 	tradeKillRatio := tradeKillsPerRound / BaselineTradeKillsPerRound
 	tradeRating += (tradeKillRatio - 1.0) * 0.3
-
-	// Reward for being traded when dying
 	if p.Deaths > 0 {
 		tradedPct := float64(p.TradedDeaths) / float64(p.Deaths)
 		tradeRating += tradedPct * 0.2
 	}
-
-	// Reward for saving teammates
 	savesPerRound := float64(p.SavedTeammate) / rounds
 	tradeRating += savesPerRound * 1.5
-
 	tradeRating = math.Max(0.6, math.Min(1.5, tradeRating))
 
-	// === Component 9: Utility Rating (2%) ===
-	// Measures support impact - utility damage and flash assists
-	utilityRating := 1.0
-
-	// Utility damage contribution
+	// === Utility Rating (2%) ===
 	utilDmgPerRound := float64(p.UtilityDamage) / rounds
 	utilDmgRatio := utilDmgPerRound / BaselineUtilityDamage
-
-	// Flash assist contribution
 	flashAssistsPerRound := float64(p.FlashAssists) / rounds
 	flashAssistRatio := flashAssistsPerRound / BaselineFlashAssists
-
-	// Enemy flash duration contribution
 	enemyFlashPerRound := p.EnemyFlashDuration / rounds
 	enemyFlashRatio := enemyFlashPerRound / BaselineEnemyFlashDur
-
-	// Combined utility score (weighted average)
 	utilityScore := (utilDmgRatio*0.4 + flashAssistRatio*0.3 + enemyFlashRatio*0.3)
-	utilityRating = 0.7 + utilityScore*0.3
+	utilityRating := 0.7 + utilityScore*0.3
 	utilityRating = math.Max(0.5, math.Min(1.4, utilityRating))
 
-	// === Additional Penalties/Bonuses ===
+	// === Round Swing Rating (1%) ===
+	avgSwing := p.RoundSwing / rounds
+	var swingRating float64
+	if avgSwing >= 0.05 {
+		swingRating = 1.0 + (avgSwing/0.15)*0.4
+	} else if avgSwing >= 0 {
+		swingRating = 1.0 + (avgSwing/0.10)*0.2
+	} else {
+		swingRating = 1.0 + (avgSwing/0.10)*0.3
+	}
+	swingRating = math.Max(0.6, math.Min(1.4, swingRating))
 
-	// Proportional clutch modifier (replaces binary penalty)
-	clutchModifier := 0.0
+	// ==================== COST COMPONENTS (40%) ====================
+
+	// === Death Rating (12%) ===
+	dpr := float64(p.Deaths) / rounds
+	deathRatio := dpr / BaselineDPR
+	var deathRating float64
+	if deathRatio <= 0.5 {
+		deathRating = 1.9
+	} else if deathRatio <= 0.8 {
+		deathRating = 1.7 - (deathRatio * 0.4)
+	} else if deathRatio <= 1.0 {
+		deathRating = 1.4 - (deathRatio * 0.3)
+	} else if deathRatio <= 1.3 {
+		deathRating = 1.0 / math.Pow(deathRatio, 1.0)
+	} else {
+		deathRating = 1.0 / math.Pow(deathRatio, 1.2)
+	}
+	deathRating = math.Max(0.3, math.Min(1.9, deathRating))
+
+	// === Eco Death Rating (10%) ===
+	// High eco death value = dying with expensive equipment = bad
+	ecoDeathPerRound := p.EcoDeathValue / rounds
+	ecoDeathRatio := ecoDeathPerRound / BaselineEcoDeathValue
+	var ecoDeathRating float64
+	if ecoDeathRatio <= 0.5 {
+		ecoDeathRating = 1.5 // Low eco deaths = good
+	} else if ecoDeathRatio <= 1.0 {
+		ecoDeathRating = 1.5 - (ecoDeathRatio * 0.5)
+	} else if ecoDeathRatio <= 1.5 {
+		ecoDeathRating = 1.0 - (ecoDeathRatio-1.0)*0.4
+	} else {
+		ecoDeathRating = 0.8 - (ecoDeathRatio-1.5)*0.2
+	}
+	ecoDeathRating = math.Max(0.4, math.Min(1.5, ecoDeathRating))
+
+	// === Early Death Rating (8%) ===
+	// Early deaths in rounds hurt the team
+	earlyDeathsPerRound := float64(p.EarlyDeaths) / rounds
+	earlyDeathRatio := earlyDeathsPerRound / BaselineEarlyDeaths
+	var earlyDeathRating float64
+	if earlyDeathRatio <= 0.5 {
+		earlyDeathRating = 1.4
+	} else if earlyDeathRatio <= 1.0 {
+		earlyDeathRating = 1.4 - (earlyDeathRatio * 0.4)
+	} else if earlyDeathRatio <= 2.0 {
+		earlyDeathRating = 1.0 - (earlyDeathRatio-1.0)*0.3
+	} else {
+		earlyDeathRating = 0.7 - (earlyDeathRatio-2.0)*0.1
+	}
+	earlyDeathRating = math.Max(0.4, math.Min(1.4, earlyDeathRating))
+
+	// === Untraded Opening Death Rating (5%) ===
+	// Opening deaths that weren't traded are very costly
+	untradedOpenings := float64(p.OpeningDeaths - p.OpeningDeathsTraded)
+	if untradedOpenings < 0 {
+		untradedOpenings = 0
+	}
+	untradedPerRound := untradedOpenings / rounds
+	untradedRatio := untradedPerRound / BaselineUntradedOpenings
+	var untradedDeathRating float64
+	if untradedRatio <= 0.5 {
+		untradedDeathRating = 1.3
+	} else if untradedRatio <= 1.0 {
+		untradedDeathRating = 1.3 - (untradedRatio * 0.3)
+	} else if untradedRatio <= 2.0 {
+		untradedDeathRating = 1.0 - (untradedRatio-1.0)*0.25
+	} else {
+		untradedDeathRating = 0.75 - (untradedRatio-2.0)*0.1
+	}
+	untradedDeathRating = math.Max(0.5, math.Min(1.3, untradedDeathRating))
+
+	// === Team Flash Rating (2%) ===
+	// Flashing teammates is bad
+	teamFlashPerRound := float64(p.TeamFlashCount) / rounds
+	teamFlashRatio := teamFlashPerRound / BaselineTeamFlashPerRound
+	var teamFlashRating float64
+	if teamFlashRatio <= 0.5 {
+		teamFlashRating = 1.2 // Few team flashes = good
+	} else if teamFlashRatio <= 1.0 {
+		teamFlashRating = 1.2 - (teamFlashRatio * 0.2)
+	} else if teamFlashRatio <= 2.0 {
+		teamFlashRating = 1.0 - (teamFlashRatio-1.0)*0.2
+	} else {
+		teamFlashRating = 0.8 - (teamFlashRatio-2.0)*0.1
+	}
+	teamFlashRating = math.Max(0.5, math.Min(1.2, teamFlashRating))
+
+	// === Failed Clutch Rating (3%) ===
+	// Failed clutches when you had a chance
+	var failedClutchRating float64 = 1.0
 	if p.ClutchRounds > 0 {
-		clutchWinRate := float64(p.ClutchWins) / float64(p.ClutchRounds)
-		if clutchWinRate < 0.3 {
-			// Penalty for low clutch win rate
-			clutchModifier = -float64(p.ClutchRounds) * (0.3 - clutchWinRate) * 0.04
+		failedClutches := p.ClutchRounds - p.ClutchWins
+		failRate := float64(failedClutches) / float64(p.ClutchRounds)
+		failRatio := failRate / BaselineFailedClutchRate
+		if failRatio <= 0.5 {
+			failedClutchRating = 1.4 // Win most clutches = good
+		} else if failRatio <= 1.0 {
+			failedClutchRating = 1.4 - (failRatio * 0.4)
+		} else if failRatio <= 1.5 {
+			failedClutchRating = 1.0 - (failRatio-1.0)*0.3
 		} else {
-			// Bonus for good clutch performance
-			clutchModifier = float64(p.ClutchWins) * 0.015
+			failedClutchRating = 0.85 - (failRatio-1.5)*0.1
 		}
+		failedClutchRating = math.Max(0.6, math.Min(1.4, failedClutchRating))
 	}
 
-	// AWP economy penalty - dying with AWP without getting a kill
-	awpPenalty := 0.0
-	if p.AWPDeathsNoKill > 0 {
-		awpPenalty = float64(p.AWPDeathsNoKill) / rounds * 0.12
-	}
+	// ==================== COMBINE COMPONENTS ====================
 
-	// === Combine Components ===
-	rating := killRating*WeightKillRating +
-		deathRating*WeightDeathRating +
+	// Output components (60%)
+	outputRating := killRating*WeightKillRating +
 		adrRating*WeightADRRating +
-		swingRating*WeightSwingRating +
 		multiKillRating*WeightMultiKillRating +
 		kastRating*WeightKASTRating +
 		openingRating*WeightOpeningRating +
 		tradeRating*WeightTradeRating +
 		utilityRating*WeightUtilityRating +
-		clutchModifier -
-		awpPenalty
+		swingRating*WeightSwingRating
+
+	// Cost components (40%)
+	costRating := deathRating*WeightDeathRating +
+		ecoDeathRating*WeightEcoDeathRating +
+		earlyDeathRating*WeightEarlyDeathRating +
+		untradedDeathRating*WeightUntradedDeathRating +
+		teamFlashRating*WeightTeamFlashRating +
+		failedClutchRating*WeightFailedClutchRating
+
+	rating := outputRating + costRating
 
 	// Clamp to reasonable range
 	return math.Max(MinRating, math.Min(MaxRating, rating))
