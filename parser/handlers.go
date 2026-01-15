@@ -7,9 +7,15 @@ import (
 
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/events"
+	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/msg"
 )
 
 func (d *DemoParser) registerHandlers() {
+	// Capture map name from server info message
+	d.parser.RegisterNetMessageHandler(func(m *msg.CSVCMsg_ServerInfo) {
+		d.state.MapName = m.GetMapName()
+	})
+
 	// Track when match actually starts (after warmup/knife round)
 	d.parser.RegisterEventHandler(func(e events.MatchStart) {
 		d.state.MatchStarted = true
@@ -57,7 +63,7 @@ func (d *DemoParser) registerHandlers() {
 		d.logger.LogBombDefuse(d.state.RoundNumber, defuser.Name)
 	})
 
-	// Track flash assists and team flashes
+	// Track flash assists, team flashes, and enemy flash duration
 	d.parser.RegisterEventHandler(func(e events.PlayerFlashed) {
 		if d.state.IsKnifeRound || !d.state.MatchStarted {
 			return
@@ -65,13 +71,29 @@ func (d *DemoParser) registerHandlers() {
 
 		if e.Attacker != nil && e.Player != nil {
 			roundStats := d.state.ensureRound(e.Attacker)
+			flashDuration := e.FlashDuration().Seconds()
 			if e.Attacker.Team != e.Player.Team {
-				// Enemy flash - count as flash assist
+				// Enemy flash - count as flash assist and track duration
 				roundStats.FlashAssists++
+				roundStats.EnemyFlashDuration += flashDuration
 			} else if e.Attacker.SteamID64 != e.Player.SteamID64 {
 				// Team flash (not self-flash)
 				roundStats.TeamFlashCount++
-				roundStats.TeamFlashDuration += float64(e.FlashDuration().Seconds())
+				roundStats.TeamFlashDuration += flashDuration
+			}
+		}
+	})
+
+	// Track flashbang throws
+	d.parser.RegisterEventHandler(func(e events.GrenadeProjectileThrow) {
+		if d.state.IsKnifeRound || !d.state.MatchStarted {
+			return
+		}
+
+		if e.Projectile != nil && e.Projectile.Thrower != nil {
+			if e.Projectile.WeaponInstance != nil && e.Projectile.WeaponInstance.Type == common.EqFlash {
+				roundStats := d.state.ensureRound(e.Projectile.Thrower)
+				roundStats.FlashesThrown++
 			}
 		}
 	})
@@ -97,6 +119,11 @@ func (d *DemoParser) registerHandlers() {
 		d.state.IsKnifeRound = false
 		d.state.RoundNumber++
 
+		// Determine if this is a pistol round (round 1 or 13 in MR12, or round 1 of OT)
+		isPistolRound := d.state.RoundNumber == 1 || d.state.RoundNumber == 13 ||
+			(d.state.RoundNumber > 24 && (d.state.RoundNumber-25)%6 == 0)
+		d.state.IsPistolRound = isPistolRound
+
 		// Track round start time and determine current side
 		d.state.RoundStartTime = float64(d.parser.CurrentFrame()) / 64.0 // Convert ticks to seconds (64 tick rate)
 
@@ -117,7 +144,14 @@ func (d *DemoParser) registerHandlers() {
 		// Initialize round stats for ALL playing participants
 		for _, p := range participants {
 			d.state.ensurePlayer(p)
-			d.state.ensureRound(p)
+			roundStats := d.state.ensureRound(p)
+			roundStats.IsPistolRound = isPistolRound
+			// Track which side player is on this round
+			if p.Team == common.TeamTerrorists {
+				roundStats.PlayerSide = "T"
+			} else if p.Team == common.TeamCounterTerrorists {
+				roundStats.PlayerSide = "CT"
+			}
 		}
 	})
 
@@ -171,14 +205,26 @@ func (d *DemoParser) registerHandlers() {
 					// This is a trade! Mark the original victim as traded
 					if tradedRound, exists := d.state.Round[recent.VictimID]; exists {
 						tradedRound.Traded = true
+						tradedRound.SavedByTeammate = true
 					}
 					tradedPlayerName := ""
 					if tradedPlayer, exists := d.state.Players[recent.VictimID]; exists {
 						tradedPlayer.TradedDeaths++
 						tradedPlayerName = tradedPlayer.Name
+
+						// Check if this was an opening death that got traded
+						if tradedRound, exists := d.state.Round[recent.VictimID]; exists {
+							if tradedRound.OpeningDeath {
+								tradedPlayer.OpeningDeathsTraded++
+							}
+						}
 					}
-					// Attacker gets a trade denial credit
-					d.state.ensurePlayer(a).TradeDenials++
+					// Attacker gets a trade denial credit and saved teammate credit
+					attackerStats := d.state.ensurePlayer(a)
+					attackerStats.TradeDenials++
+					attackerStats.SavedTeammate++
+					attackerRound := d.state.ensureRound(a)
+					attackerRound.SavedTeammate = true
 
 					// Log the trade
 					d.logger.LogTrade(d.state.RoundNumber, a.Name, tradedPlayerName, v.Name)
@@ -240,6 +286,9 @@ func (d *DemoParser) registerHandlers() {
 				attacker.AWPKills++
 			case common.EqKnife:
 				round.KnifeKill = true
+			case common.EqHE, common.EqMolotov, common.EqIncendiary:
+				round.UtilityKills++
+				attacker.UtilityKills++
 			}
 
 			// Check for pistol vs rifle kills
@@ -254,18 +303,29 @@ func (d *DemoParser) registerHandlers() {
 		victim.EcoDeathValue += deathPenalty
 
 		// Track opening kill and entry fragging
-		if !d.state.RoundHasKill {
-			attacker.OpeningKills++
-			round.OpeningKill = true
-			round.EntryFragger = true
-			d.state.RoundHasKill = true
-			d.logger.LogOpeningKill(d.state.RoundNumber, a.Name, v.Name)
-		}
-
-		// Track if victim got opening death
 		victimRound := d.state.ensureRound(v)
 		if !d.state.RoundHasKill {
+			attacker.OpeningKills++
+			attacker.OpeningAttempts++
+			attacker.OpeningSuccesses++
+			round.OpeningKill = true
+			round.EntryFragger = true
+			round.InvolvedInOpening = true
+
+			// Track if opening kill was with AWP
+			if e.Weapon != nil && e.Weapon.Type == common.EqAWP {
+				round.AWPOpeningKill = true
+				attacker.AWPOpeningKills++
+			}
+
+			// Track victim's opening death
+			victim.OpeningDeaths++
+			victim.OpeningAttempts++
 			victimRound.OpeningDeath = true
+			victimRound.InvolvedInOpening = true
+
+			d.state.RoundHasKill = true
+			d.logger.LogOpeningKill(d.state.RoundNumber, a.Name, v.Name)
 		}
 
 		// Track trade kills with speed
@@ -316,8 +376,11 @@ func (d *DemoParser) registerHandlers() {
 			ps := d.state.ensurePlayer(e.Attacker)
 			ps.Damage += int(e.HealthDamageTaken)
 
-			// Track utility damage
+			// Track round damage for per-round stats
 			roundStats := d.state.ensureRound(e.Attacker)
+			roundStats.Damage += int(e.HealthDamageTaken)
+
+			// Track utility damage
 			if e.Weapon != nil {
 				switch e.Weapon.Type {
 				case common.EqHE, common.EqMolotov, common.EqIncendiary:
@@ -394,6 +457,10 @@ func (d *DemoParser) registerHandlers() {
 			}
 		}
 
+		// Calculate round end time for time alive tracking
+		roundEndTime := float64(d.parser.CurrentFrame()) / 64.0
+		roundDuration := roundEndTime - d.state.RoundStartTime
+
 		// Track survival and round outcome for players
 		for _, p := range gs.Participants().Playing() {
 			ps := d.state.ensurePlayer(p)
@@ -404,20 +471,34 @@ func (d *DemoParser) registerHandlers() {
 			round.TeamWon = teamWon
 			if teamWon {
 				ps.RoundsWon++
+			} else {
+				ps.RoundsLost++
 			}
 
-			// Track survival
+			// Track survival and time alive
 			if p.IsAlive() {
 				ps.Survival++
 				round.Survived = true
+				round.TimeAlive = roundDuration
+				ps.TotalTimeAlive += roundDuration
+
+				// Track saves on loss (survived a lost round)
+				if !teamWon {
+					ps.SavesOnLoss++
+				}
+			} else if round.DeathTime > 0 {
+				// Player died - time alive is death time
+				round.TimeAlive = round.DeathTime
+				ps.TotalTimeAlive += round.DeathTime
 			}
 		}
 
 		// Detect clutch situations and track clutch performance
 		for _, p := range gs.Participants().Playing() {
 			round := d.state.ensureRound(p)
+			ps := d.state.ensurePlayer(p)
 
-			// Count alive teammates and enemies
+			// Count alive teammates and enemies at round end
 			aliveTeammates := 0
 			aliveEnemies := 0
 
@@ -431,19 +512,31 @@ func (d *DemoParser) registerHandlers() {
 				}
 			}
 
-			// Clutch situation: player is last alive on their team
-			if p.IsAlive() && aliveTeammates == 1 && aliveEnemies > 0 {
-				round.ClutchAttempt = true
-				round.ClutchKills = round.Kills // Kills made during clutch
+			// Track last alive situations
+			if p.IsAlive() && aliveTeammates == 1 {
+				ps.LastAliveRounds++
+				round.WasLastAlive = true
 
-				if round.TeamWon {
-					round.ClutchWon = true
-					ps := d.state.ensurePlayer(p)
-					ps.ClutchWins++
+				// Clutch situation: player is last alive on their team with enemies remaining
+				if aliveEnemies > 0 {
+					round.ClutchAttempt = true
+					round.ClutchSize = aliveEnemies
+					round.ClutchKills = round.Kills
+					ps.ClutchRounds++
+
+					// Track 1v1 specifically
+					if aliveEnemies == 1 {
+						ps.Clutch1v1Attempts++
+						if round.TeamWon {
+							ps.Clutch1v1Wins++
+						}
+					}
+
+					if round.TeamWon {
+						round.ClutchWon = true
+						ps.ClutchWins++
+					}
 				}
-
-				ps := d.state.ensurePlayer(p)
-				ps.ClutchRounds++
 			}
 
 			// Track weapon saves (survived a lost round)
@@ -548,6 +641,13 @@ func (d *DemoParser) registerHandlers() {
 			// Calculate advanced round swing
 			swing := CalculateAdvancedRoundSwing(roundStats, roundContext, playerEquipValue, teamEquipValue)
 			player.RoundSwing += swing
+
+			// Track round swing per side
+			if roundStats.PlayerSide == "T" {
+				player.TRoundSwing += swing
+			} else if roundStats.PlayerSide == "CT" {
+				player.CTRoundSwing += swing
+			}
 		}
 
 		// Track KAST and aggregate new stats for ALL players who participated this round
@@ -561,11 +661,60 @@ func (d *DemoParser) registerHandlers() {
 				player.KAST++
 			}
 
-			// Aggregate new stats for export
+			// Track rounds with kills
+			if roundStats.GotKill {
+				player.RoundsWithKill++
+				player.AttackRounds++
+			}
+
+			// Track rounds with multi-kills
+			if roundStats.Kills >= 2 {
+				player.RoundsWithMultiKill++
+			}
+
+			// Track kills and damage in won rounds
+			if roundStats.TeamWon {
+				player.KillsInWonRounds += roundStats.Kills
+				player.DamageInWonRounds += roundStats.Damage
+
+				// Track win after opening kill
+				if roundStats.OpeningKill {
+					player.RoundsWonAfterOpening++
+				}
+			}
+
+			// Track AWP stats
+			if roundStats.AWPKill {
+				player.RoundsWithAWPKill++
+			}
+			if roundStats.AWPKills >= 2 {
+				player.AWPMultiKillRounds++
+			}
+
+			// Track support rounds (assist or flash assist)
+			if roundStats.GotAssist || roundStats.FlashAssists > 0 {
+				player.SupportRounds++
+				roundStats.IsSupportRound = true
+			}
+
+			// Track assisted kills (kills where this player assisted)
+			if roundStats.GotAssist {
+				player.AssistedKills += roundStats.Assists
+			}
+
+			// Aggregate utility stats
 			player.UtilityDamage += roundStats.UtilityDamage
+			player.FlashesThrown += roundStats.FlashesThrown
+			player.FlashAssists += roundStats.FlashAssists
+			player.EnemyFlashDuration += roundStats.EnemyFlashDuration
 			player.TeamFlashCount += roundStats.TeamFlashCount
 			player.TeamFlashDuration += roundStats.TeamFlashDuration
 			player.ExitFrags += roundStats.ExitFrags
+
+			// Track saved by teammate
+			if roundStats.SavedByTeammate {
+				player.SavedByTeammate++
+			}
 
 			if roundStats.LostAWP {
 				player.AWPDeaths++
@@ -591,6 +740,83 @@ func (d *DemoParser) registerHandlers() {
 
 			if roundStats.DeathTime > 0 && roundStats.DeathTime < 30.0 {
 				player.EarlyDeaths++
+			}
+
+			// Track pistol round stats
+			if roundStats.IsPistolRound {
+				player.PistolRoundsPlayed++
+				player.PistolRoundKills += roundStats.Kills
+				player.PistolRoundDamage += roundStats.Damage
+				if roundStats.DeathTime > 0 {
+					player.PistolRoundDeaths++
+				} else if roundStats.Survived {
+					player.PistolRoundSurvivals++
+				}
+				if roundStats.TeamWon {
+					player.PistolRoundsWon++
+				}
+				if roundStats.Kills >= 2 {
+					player.PistolRoundMultiKills++
+				}
+			}
+
+			// Track per-side stats for HLTV 1.0 and Eco Rating
+			if roundStats.PlayerSide == "T" {
+				player.TRoundsPlayed++
+				player.TKills += roundStats.Kills
+				player.TDamage += roundStats.Damage
+				player.TEcoKillValue += roundStats.EconImpact
+				if roundStats.Survived {
+					player.TSurvivals++
+				}
+				if roundStats.DeathTime > 0 {
+					player.TDeaths++
+				}
+				if roundStats.Kills >= 2 {
+					player.TRoundsWithMultiKill++
+				}
+				if roundStats.Kills >= 0 && roundStats.Kills <= 5 {
+					player.TMultiKills[roundStats.Kills]++
+				}
+				// Track KAST for T-side
+				if roundStats.GotKill || roundStats.GotAssist || roundStats.Survived || roundStats.Traded {
+					player.TKAST++
+				}
+				// Track clutch stats for T-side
+				if roundStats.ClutchAttempt {
+					player.TClutchRounds++
+					if roundStats.ClutchWon {
+						player.TClutchWins++
+					}
+				}
+			} else if roundStats.PlayerSide == "CT" {
+				player.CTRoundsPlayed++
+				player.CTKills += roundStats.Kills
+				player.CTDamage += roundStats.Damage
+				player.CTEcoKillValue += roundStats.EconImpact
+				if roundStats.Survived {
+					player.CTSurvivals++
+				}
+				if roundStats.DeathTime > 0 {
+					player.CTDeaths++
+				}
+				if roundStats.Kills >= 2 {
+					player.CTRoundsWithMultiKill++
+				}
+				if roundStats.Kills >= 0 && roundStats.Kills <= 5 {
+					player.CTMultiKills[roundStats.Kills]++
+				}
+				// Track KAST for CT-side
+				if roundStats.GotKill || roundStats.GotAssist || roundStats.Survived || roundStats.Traded {
+					player.CTKAST++
+				}
+				// Track clutch stats for CT-side
+				if roundStats.ClutchAttempt {
+					player.CTClutchRounds++
+					if roundStats.ClutchWon {
+						player.CTClutchWins++
+					}
+				}
 			}
 		}
 

@@ -153,3 +153,110 @@ func sumMulti(m [6]int) int {
 	}
 	return total
 }
+
+// ComputeSideRating calculates eco rating for a specific side (T or CT)
+// Uses the same formula as ComputeFinalRating but with side-specific stats
+func ComputeSideRating(rounds int, kills int, deaths int, damage int, ecoKillValue float64,
+	roundSwing float64, kast float64, multiKills [6]int, clutchRounds int, clutchWins int) float64 {
+
+	roundsF := float64(rounds)
+	if roundsF == 0 {
+		return 0
+	}
+
+	// === Component 1: Kill Rating (28%) ===
+	ecoKPR := ecoKillValue / roundsF
+	killRatio := ecoKPR / BaselineKPR
+	var killRating float64
+	if killRatio >= 1.5 {
+		killRating = 1.0 + (killRatio-1.0)*1.3
+	} else if killRatio >= 1.2 {
+		killRating = 1.0 + (killRatio-1.0)*0.7
+	} else if killRatio >= 0.8 {
+		killRating = math.Pow(killRatio, 0.9)
+	} else {
+		killRating = math.Pow(killRatio, 1.1)
+	}
+
+	// === Component 2: Death Rating (18%) ===
+	dpr := float64(deaths) / roundsF
+	deathRatio := dpr / BaselineDPR
+	var deathRating float64
+	if deathRatio <= 0.5 {
+		deathRating = 2.0 - (deathRatio * 0.2)
+	} else if deathRatio <= 0.8 {
+		deathRating = 1.7 - (deathRatio * 0.4)
+	} else if deathRatio <= 1.0 {
+		deathRating = 1.4 - (deathRatio * 0.3)
+	} else if deathRatio <= 1.3 {
+		deathRating = 1.0 / math.Pow(deathRatio, 1.0)
+	} else {
+		deathRating = 1.0 / math.Pow(deathRatio, 1.2)
+	}
+	deathRating = math.Max(0.3, math.Min(1.9, deathRating))
+
+	// === Component 3: ADR Rating (18%) ===
+	adr := float64(damage) / roundsF
+	adrRatio := adr / BaselineADR
+	var adrRating float64
+	if adrRatio >= 1.4 {
+		adrRating = 0.8 + (adrRatio * 0.6)
+	} else if adrRatio >= 1.0 {
+		adrRating = 0.7 + (adrRatio * 0.5)
+	} else if adrRatio >= 0.8 {
+		adrRating = 0.4 + (adrRatio * 0.6)
+	} else {
+		adrRating = 0.3 + (adrRatio * 0.5)
+	}
+
+	// === Component 4: Round Swing Rating (14%) ===
+	avgSwing := roundSwing / roundsF
+	var swingRating float64
+	if avgSwing >= 0.05 {
+		swingRating = 1.0 + (avgSwing/0.15)*0.4
+	} else if avgSwing >= 0 {
+		swingRating = 1.0 + (avgSwing/0.10)*0.2
+	} else {
+		swingRating = 1.0 + (avgSwing/0.10)*0.3
+	}
+	swingRating = math.Max(0.6, math.Min(1.4, swingRating))
+
+	// === Component 5: Multi-Kill Rating (12%) ===
+	multiKillBonus := float64(sumMulti(multiKills)) / roundsF
+	multiKillRating := math.Min(math.Pow(multiKillBonus/BaselineMultiKill, 0.8), 2.0)
+
+	kastPct := kast / roundsF
+	overallPerformance := (ecoKPR/BaselineKPR + (adr / BaselineADR) + kastPct/BaselineKAST) / 3.0
+	if multiKillRating > 1.0 {
+		penaltyFactor := math.Pow(math.Min(1.0, overallPerformance), 2)
+		multiKillRating = 1.0 + (multiKillRating-1.0)*penaltyFactor
+	}
+
+	// === Component 6: KAST Rating (8%) ===
+	kastRatio := kastPct / BaselineKAST
+	var kastRating float64
+	if kastRatio >= 1.2 {
+		kastRating = 1.0 + (kastRatio-1.0)*0.6
+	} else if kastRatio >= 0.9 {
+		kastRating = kastRatio
+	} else {
+		kastRating = math.Pow(kastRatio, 1.2)
+	}
+
+	// === Additional Penalties ===
+	clutchPenalty := 0.0
+	if clutchRounds > 0 && clutchWins == 0 {
+		clutchPenalty = float64(clutchRounds) * 0.02
+	}
+
+	// === Combine Components ===
+	rating := killRating*WeightKillRating +
+		deathRating*WeightDeathRating +
+		adrRating*WeightADRRating +
+		swingRating*WeightSwingRating +
+		multiKillRating*WeightMultiKillRating +
+		kastRating*WeightKASTRating -
+		clutchPenalty
+
+	return math.Max(MinRating, math.Min(MaxRating, rating))
+}

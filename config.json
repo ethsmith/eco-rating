@@ -3,7 +3,9 @@
   "tier": "contender",
   "base_url": "https://cscdemos.nyc3.digitaloceanspaces.com/",
   "prefix": "s19/Combines/",
-  "output_dir": "./demos",
+  "output_dir": "D:\\demos",
   "demo_path": "",
-  "enable_logging": true
+  "enable_logging": true,
+  "enable_csdm": false,
+  "heatmap_path": "D:\\heatmaps"
 }

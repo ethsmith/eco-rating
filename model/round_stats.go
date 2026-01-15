@@ -11,7 +11,8 @@ type RoundStats struct {
 	EconImpact float64
 
 	// AWP specific stats
-	AWPKills int
+	AWPKills       int
+	AWPOpeningKill bool // Got opening kill with AWP
 
 	// Round Swing tracking
 	TeamWon      bool // Did this player's team win the round?
@@ -29,6 +30,7 @@ type RoundStats struct {
 	EntryFragger   bool // Got first kill of the round for their team
 	ClutchAttempt  bool // Was in a clutch situation (1vX)
 	ClutchWon      bool // Won a clutch situation
+	ClutchSize     int  // Size of clutch (1v1, 1v2, etc.) - the number of enemies
 	SavedWeapons   bool // Survived a lost round (weapon save)
 	EcoKill        bool // Got a kill while on eco/force buy
 	AntiEcoKill    bool // Got killed by eco while on full buy
@@ -36,21 +38,39 @@ type RoundStats struct {
 	TradeKill      bool // Got a trade kill
 	TradeDeath     bool // Death was traded by teammate
 
+	// Support stats
+	SavedByTeammate bool // Was saved by a teammate this round
+	SavedTeammate   bool // Saved a teammate this round
+	IsSupportRound  bool // Had assist or flash assist this round
+
+	// Opening duel tracking
+	InvolvedInOpening bool // Was involved in the first duel (killer or victim)
+
 	// New Round Swing factors
-	UtilityDamage     int       // Damage dealt via grenades (HE, molotov, incendiary)
-	SmokeDamage       int       // Damage dealt through smoke
-	DeathTime         float64   // Time of death relative to round start (seconds)
-	KillTimes         []float64 // Times of each kill relative to round start
-	TradeSpeed        float64   // Time between teammate death and trade kill (seconds)
-	IsExitFrag        bool      // Kill happened after round was decided
-	ExitFrags         int       // Number of exit frags this round
-	TeamFlashCount    int       // Number of times flashed teammates
-	TeamFlashDuration float64   // Total duration of team flashes
-	AWPKill           bool      // Got a kill with AWP this round
-	KnifeKill         bool      // Got a knife kill this round
-	PistolVsRifleKill bool      // Got a pistol kill vs rifle
-	HadAWP            bool      // Player had AWP this round
-	LostAWP           bool      // Died with AWP (lost the weapon)
+	UtilityDamage      int       // Damage dealt via grenades (HE, molotov, incendiary)
+	UtilityKills       int       // Kills with utility this round
+	SmokeDamage        int       // Damage dealt through smoke
+	DeathTime          float64   // Time of death relative to round start (seconds)
+	TimeAlive          float64   // Time alive in this round (seconds)
+	KillTimes          []float64 // Times of each kill relative to round start
+	TradeSpeed         float64   // Time between teammate death and trade kill (seconds)
+	IsExitFrag         bool      // Kill happened after round was decided
+	ExitFrags          int       // Number of exit frags this round
+	TeamFlashCount     int       // Number of times flashed teammates
+	TeamFlashDuration  float64   // Total duration of team flashes
+	FlashesThrown      int       // Number of flashes thrown this round
+	EnemyFlashDuration float64   // Total duration enemies were flashed
+	AWPKill            bool      // Got a kill with AWP this round
+	KnifeKill          bool      // Got a knife kill this round
+	PistolVsRifleKill  bool      // Got a pistol kill vs rifle
+	HadAWP             bool      // Player had AWP this round
+	LostAWP            bool      // Died with AWP (lost the weapon)
+
+	// Pistol round tracking
+	IsPistolRound bool // Is this a pistol round (round 1 or 13)
+
+	// Side tracking
+	PlayerSide string // "T" or "CT" - which side player is on this round
 }
 
 // RoundContext provides situational information for round swing calculation

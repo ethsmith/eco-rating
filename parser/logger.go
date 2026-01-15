@@ -1,24 +1,37 @@
 package parser
 
 import (
+	"bytes"
 	"log"
-	"os"
 )
 
 // Logger provides formatted logging for demo parsing events
 type Logger struct {
-	enabled       bool
-	logger        *log.Logger
-	playerFilter  map[string]bool // If non-empty, only log events involving these players
+	enabled      bool
+	logger       *log.Logger
+	buffer       *bytes.Buffer
+	playerFilter map[string]bool // If non-empty, only log events involving these players
 }
 
 // NewLogger creates a new logger instance
 func NewLogger(enabled bool) *Logger {
+	buf := &bytes.Buffer{}
 	return &Logger{
 		enabled:      enabled,
-		logger:       log.New(os.Stdout, "", 0),
+		logger:       log.New(buf, "", 0),
+		buffer:       buf,
 		playerFilter: make(map[string]bool),
 	}
+}
+
+// GetOutput returns the buffered log output
+func (l *Logger) GetOutput() string {
+	return l.buffer.String()
+}
+
+// ClearOutput clears the buffered log output
+func (l *Logger) ClearOutput() {
+	l.buffer.Reset()
 }
 
 // SetPlayerFilter sets the list of players to filter logs for

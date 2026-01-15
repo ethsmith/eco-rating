@@ -26,6 +26,12 @@ type Config struct {
 
 	// Enable logging during parsing
 	EnableLogging bool `json:"enable_logging"`
+
+	// Enable CS Demo Manager integration (analyze + heatmaps)
+	EnableCsdm bool `json:"enable_csdm"`
+
+	// Output directory for generated heatmaps
+	HeatmapPath string `json:"heatmap_path"`
 }
 
 // DefaultConfig returns a config with sensible defaults
@@ -38,6 +44,8 @@ func DefaultConfig() *Config {
 		OutputDir:     "./demos",
 		DemoPath:      "",
 		EnableLogging: true,
+		EnableCsdm:    true,
+		HeatmapPath:   "./heatmaps",
 	}
 }
 

@@ -8,12 +8,14 @@ import (
 )
 
 type MatchState struct {
-	Players      map[uint64]*model.PlayerStats
-	Round        map[uint64]*model.RoundStats
-	RoundHasKill bool
-	MatchStarted bool
-	IsKnifeRound bool
-	RoundNumber  int
+	Players       map[uint64]*model.PlayerStats
+	Round         map[uint64]*model.RoundStats
+	RoundHasKill  bool
+	MatchStarted  bool
+	IsKnifeRound  bool
+	IsPistolRound bool
+	RoundNumber   int
+	MapName       string
 	// Track recent kills for trade detection: killer SteamID -> (victim SteamID, tick)
 	RecentKills map[uint64]recentKill
 	// Round context tracking
