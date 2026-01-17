@@ -259,11 +259,11 @@ func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName stri
 		agg.AWPOpeningKills += p.AWPOpeningKills
 
 		// Multi-kills
-		agg.MultiKills.OneK += p.MultiKills[1]
-		agg.MultiKills.TwoK += p.MultiKills[2]
-		agg.MultiKills.ThreeK += p.MultiKills[3]
-		agg.MultiKills.FourK += p.MultiKills[4]
-		agg.MultiKills.FiveK += p.MultiKills[5]
+		agg.MultiKills.OneK += p.MultiKillsRaw[1]
+		agg.MultiKills.TwoK += p.MultiKillsRaw[2]
+		agg.MultiKills.ThreeK += p.MultiKillsRaw[3]
+		agg.MultiKills.FourK += p.MultiKillsRaw[4]
+		agg.MultiKills.FiveK += p.MultiKillsRaw[5]
 
 		// Eco values
 		agg.EcoKillValue += p.EcoKillValue

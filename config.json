@@ -1,10 +1,10 @@
 {
-  "cumulative": true,
-  "tier": "recruit,prospect,contender",
+  "cumulative": false,
+  "tier": "recruit,prospect,contender,challenger,elite,premier",
   "base_url": "https://cscdemos.nyc3.digitaloceanspaces.com/",
   "prefix": "s19/Combines/",
   "output_dir": "D:\\demos",
-  "demo_path": "",
+  "demo_path": "D:\\blast\\ecstatic-vs-falcons-m1-inferno.dem",
   "enable_logging": true,
   "enable_csdm": false,
   "heatmap_path": "D:\\heatmaps"

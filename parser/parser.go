@@ -132,7 +132,87 @@ func (d *DemoParser) Parse() {
 
 				p.CTRating = (ctKillRating + 0.7*ctSurvivalRating + ctRMKRating) / 2.7
 			}
+
+			// Calculate all per-round and percentage stats
+			p.TimeAlivePerRound = p.TotalTimeAlive / rounds
+			p.EnemyFlashDurationPerRound = p.EnemyFlashDuration / rounds
+			p.TeamFlashDurationPerRound = p.TeamFlashDuration / rounds
+			p.RoundsWithKillPct = float64(p.RoundsWithKill) / rounds
+			p.RoundsWithMultiKillPct = float64(p.RoundsWithMultiKill) / rounds
+			p.SavedByTeammatePerRound = float64(p.SavedByTeammate) / rounds
+			p.TradedDeathsPerRound = float64(p.TradedDeaths) / rounds
+			p.AssistsPerRound = float64(p.Assists) / rounds
+			p.SupportRoundsPct = float64(p.SupportRounds) / rounds
+			p.SavedTeammatePerRound = float64(p.SavedTeammate) / rounds
+			p.TradeKillsPerRound = float64(p.TradeKills) / rounds
+			p.OpeningKillsPerRound = float64(p.OpeningKills) / rounds
+			p.OpeningDeathsPerRound = float64(p.OpeningDeaths) / rounds
+			p.OpeningAttemptsPct = float64(p.OpeningAttempts) / rounds
+			p.AttacksPerRound = float64(p.AttackRounds) / rounds
+			p.ClutchPointsPerRound = float64(p.ClutchWins) / rounds
+			p.LastAlivePct = float64(p.LastAliveRounds) / rounds
+			p.RoundsWithAWPKillPct = float64(p.RoundsWithAWPKill) / rounds
+			p.AWPMultiKillRoundsPerRound = float64(p.AWPMultiKillRounds) / rounds
+			p.AWPOpeningKillsPerRound = float64(p.AWPOpeningKills) / rounds
+			p.UtilityDamagePerRound = float64(p.UtilityDamage) / rounds
+			p.UtilityKillsPer100Rounds = float64(p.UtilityKills) * 100 / rounds
+			p.FlashesThrownPerRound = float64(p.FlashesThrown) / rounds
+			p.FlashAssistsPerRound = float64(p.FlashAssists) / rounds
 		}
+
+		// Stats that depend on RoundsWon
+		if p.RoundsWon > 0 {
+			p.KillsPerRoundWin = float64(p.KillsInWonRounds) / float64(p.RoundsWon)
+			p.DamagePerRoundWin = float64(p.DamageInWonRounds) / float64(p.RoundsWon)
+		}
+
+		// Stats that depend on RoundsLost
+		if p.RoundsLost > 0 {
+			p.SavesPerRoundLoss = float64(p.SavesOnLoss) / float64(p.RoundsLost)
+		}
+
+		// Stats that depend on Deaths
+		if p.Deaths > 0 {
+			p.TradedDeathsPct = float64(p.TradedDeaths) / float64(p.Deaths)
+		}
+
+		// Stats that depend on OpeningDeaths
+		if p.OpeningDeaths > 0 {
+			p.OpeningDeathsTradedPct = float64(p.OpeningDeathsTraded) / float64(p.OpeningDeaths)
+		}
+
+		// Stats that depend on Kills
+		if p.Kills > 0 {
+			p.TradeKillsPct = float64(p.TradeKills) / float64(p.Kills)
+			p.AssistedKillsPct = float64(p.AssistedKills) / float64(p.Kills)
+			p.DamagePerKill = float64(p.Damage) / float64(p.Kills)
+			p.AWPKillsPct = float64(p.AWPKills) / float64(p.Kills)
+			p.LowBuyKillsPct = float64(p.LowBuyKills) / float64(p.Kills)
+			p.DisadvantagedBuyKillsPct = float64(p.DisadvantagedBuyKills) / float64(p.Kills)
+		}
+
+		// Stats that depend on OpeningAttempts
+		if p.OpeningAttempts > 0 {
+			p.OpeningSuccessPct = float64(p.OpeningSuccesses) / float64(p.OpeningAttempts)
+		}
+
+		// Stats that depend on OpeningKills
+		if p.OpeningKills > 0 {
+			p.WinPctAfterOpeningKill = float64(p.RoundsWonAfterOpening) / float64(p.OpeningKills)
+		}
+
+		// Stats that depend on Clutch1v1Attempts
+		if p.Clutch1v1Attempts > 0 {
+			p.Clutch1v1WinPct = float64(p.Clutch1v1Wins) / float64(p.Clutch1v1Attempts)
+		}
+
+		// Populate MultiKills struct from raw array
+		p.MultiKills.OneK = p.MultiKillsRaw[1]
+		p.MultiKills.TwoK = p.MultiKillsRaw[2]
+		p.MultiKills.ThreeK = p.MultiKillsRaw[3]
+		p.MultiKills.FourK = p.MultiKillsRaw[4]
+		p.MultiKills.FiveK = p.MultiKillsRaw[5]
+
 		p.FinalRating = rating.ComputeFinalRating(p)
 
 		// Calculate per-side Eco Ratings
