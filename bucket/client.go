@@ -1,3 +1,11 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// =============================================================================
+
+// Package bucket provides a client for interacting with cloud storage buckets
+// (specifically DigitalOcean Spaces) to list and download CS2 demo files.
+// It handles XML parsing of bucket listings and filtering demos by competitive tier.
 package bucket
 
 import (
@@ -9,43 +17,45 @@ import (
 	"strings"
 )
 
-// ListBucketResult represents the XML response from S3 bucket listing
+// ListBucketResult represents the XML response from an S3-compatible bucket listing.
+// It contains metadata about the bucket and its contents.
 type ListBucketResult struct {
 	XMLName        xml.Name        `xml:"ListBucketResult"`
-	Name           string          `xml:"Name"`
-	Prefix         string          `xml:"Prefix"`
-	MaxKeys        int             `xml:"MaxKeys"`
-	Delimiter      string          `xml:"Delimiter"`
-	IsTruncated    bool            `xml:"IsTruncated"`
-	CommonPrefixes []CommonPrefix  `xml:"CommonPrefixes"`
-	Contents       []BucketContent `xml:"Contents"`
+	Name           string          `xml:"Name"`           // Bucket name
+	Prefix         string          `xml:"Prefix"`         // Prefix filter used in the request
+	MaxKeys        int             `xml:"MaxKeys"`        // Maximum number of keys returned
+	Delimiter      string          `xml:"Delimiter"`      // Delimiter used for grouping (usually "/")
+	IsTruncated    bool            `xml:"IsTruncated"`    // Whether results are truncated
+	CommonPrefixes []CommonPrefix  `xml:"CommonPrefixes"` // Virtual "folders" in the bucket
+	Contents       []BucketContent `xml:"Contents"`       // Actual files in the bucket
 }
 
-// CommonPrefix represents a folder/prefix in the bucket
+// CommonPrefix represents a virtual folder/directory in the bucket listing.
 type CommonPrefix struct {
-	Prefix string `xml:"Prefix"`
+	Prefix string `xml:"Prefix"` // The folder path prefix
 }
 
-// BucketContent represents a file in the bucket
+// BucketContent represents a single file/object in the bucket.
 type BucketContent struct {
-	Key          string `xml:"Key"`
-	LastModified string `xml:"LastModified"`
-	ETag         string `xml:"ETag"`
-	Size         int64  `xml:"Size"`
-	StorageClass string `xml:"StorageClass"`
+	Key          string `xml:"Key"`          // Full path/key of the object
+	LastModified string `xml:"LastModified"` // ISO 8601 timestamp of last modification
+	ETag         string `xml:"ETag"`         // Entity tag (hash) for the object
+	Size         int64  `xml:"Size"`         // Size in bytes
+	StorageClass string `xml:"StorageClass"` // Storage class (e.g., STANDARD)
 }
 
-// Client handles S3 bucket operations
+// Client provides methods for interacting with an S3-compatible bucket.
 type Client struct {
-	BaseURL string
+	BaseURL string // Base URL of the bucket (e.g., https://bucket.nyc3.digitaloceanspaces.com/)
 }
 
-// NewClient creates a new bucket client
+// NewClient creates a new bucket client with the specified base URL.
 func NewClient(baseURL string) *Client {
 	return &Client{BaseURL: baseURL}
 }
 
-// ListFolders lists all folders (common prefixes) under a given prefix
+// ListFolders returns all virtual folders (common prefixes) under the given prefix.
+// This is used to enumerate combine event folders in the bucket.
 func (c *Client) ListFolders(prefix string) ([]string, error) {
 	result, err := c.listBucket(prefix)
 	if err != nil {
@@ -59,7 +69,7 @@ func (c *Client) ListFolders(prefix string) ([]string, error) {
 	return folders, nil
 }
 
-// ListFiles lists all files under a given prefix
+// ListFiles returns all files under the given prefix.
 func (c *Client) ListFiles(prefix string) ([]BucketContent, error) {
 	result, err := c.listBucket(prefix)
 	if err != nil {
@@ -68,7 +78,8 @@ func (c *Client) ListFiles(prefix string) ([]BucketContent, error) {
 	return result.Contents, nil
 }
 
-// ListFilesByTier lists all files under a prefix that match the given tier
+// ListFilesByTier returns files filtered by competitive tier.
+// It looks for files with names starting with "combine-{tier}".
 func (c *Client) ListFilesByTier(prefix, tier string) ([]BucketContent, error) {
 	files, err := c.ListFiles(prefix)
 	if err != nil {
@@ -78,7 +89,6 @@ func (c *Client) ListFilesByTier(prefix, tier string) ([]BucketContent, error) {
 	tierPrefix := "combine-" + tier
 	filtered := make([]BucketContent, 0)
 	for _, f := range files {
-		// Extract filename from the full key
 		parts := strings.Split(f.Key, "/")
 		filename := parts[len(parts)-1]
 		if strings.HasPrefix(filename, tierPrefix) {
@@ -88,9 +98,9 @@ func (c *Client) ListFilesByTier(prefix, tier string) ([]BucketContent, error) {
 	return filtered, nil
 }
 
-// GetAllDemosByTier fetches all demos for a tier across all combine day folders
+// GetAllDemosByTier retrieves all demo files for a specific tier across all combine folders.
+// It iterates through each combine folder and collects matching demos.
 func (c *Client) GetAllDemosByTier(combinesPrefix, tier string) ([]BucketContent, error) {
-	// First, list all day folders
 	folders, err := c.ListFolders(combinesPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list combine folders: %w", err)
@@ -108,13 +118,14 @@ func (c *Client) GetAllDemosByTier(combinesPrefix, tier string) ([]BucketContent
 	return allDemos, nil
 }
 
-// GetDownloadURL returns the full download URL for a file key
+// GetDownloadURL constructs the full download URL for a given object key.
 func (c *Client) GetDownloadURL(key string) string {
 	return c.BaseURL + key
 }
 
+// listBucket performs the actual HTTP request to list bucket contents.
+// It uses the delimiter "/" to enable folder-like navigation.
 func (c *Client) listBucket(prefix string) (*ListBucketResult, error) {
-	// Build the URL with query parameters
 	params := url.Values{}
 	params.Set("delimiter", "/")
 	params.Set("prefix", prefix)

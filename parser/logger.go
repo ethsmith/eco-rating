@@ -1,3 +1,11 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// =============================================================================
+
+// Package parser provides CS2 demo file parsing functionality.
+// This file implements a Logger for detailed parsing output with player filtering
+// and formatted event logging (kills, deaths, trades, clutches, etc.).
 package parser
 
 import (
@@ -5,15 +13,17 @@ import (
 	"log"
 )
 
-// Logger provides formatted logging for demo parsing events
+// Logger provides formatted logging for demo parsing events.
+// It supports player filtering to focus output on specific players.
 type Logger struct {
-	enabled      bool
-	logger       *log.Logger
-	buffer       *bytes.Buffer
-	playerFilter map[string]bool // If non-empty, only log events involving these players
+	enabled      bool            // Whether logging is active
+	logger       *log.Logger     // Underlying logger instance
+	buffer       *bytes.Buffer   // Buffer to capture log output
+	playerFilter map[string]bool // Set of player names to filter (empty = log all)
 }
 
-// NewLogger creates a new logger instance
+// NewLogger creates a new Logger with the specified enabled state.
+// Output is captured to an internal buffer for later retrieval.
 func NewLogger(enabled bool) *Logger {
 	buf := &bytes.Buffer{}
 	return &Logger{
@@ -24,19 +34,18 @@ func NewLogger(enabled bool) *Logger {
 	}
 }
 
-// GetOutput returns the buffered log output
+// GetOutput returns all captured log output as a string.
 func (l *Logger) GetOutput() string {
 	return l.buffer.String()
 }
 
-// ClearOutput clears the buffered log output
+// ClearOutput resets the log buffer, discarding all captured output.
 func (l *Logger) ClearOutput() {
 	l.buffer.Reset()
 }
 
-// SetPlayerFilter sets the list of players to filter logs for
-// Only events involving these players will be logged
-// Pass empty slice to clear filter and log all events
+// SetPlayerFilter sets the list of player names to include in logging.
+// Only events involving these players will be logged.
 func (l *Logger) SetPlayerFilter(players []string) {
 	l.playerFilter = make(map[string]bool)
 	for _, p := range players {
@@ -44,26 +53,25 @@ func (l *Logger) SetPlayerFilter(players []string) {
 	}
 }
 
-// AddPlayerFilter adds a player to the filter list
+// AddPlayerFilter adds a single player to the filter list.
 func (l *Logger) AddPlayerFilter(player string) {
 	l.playerFilter[player] = true
 }
 
-// ClearPlayerFilter clears the player filter (logs all events)
+// ClearPlayerFilter removes all player filters, allowing all events to be logged.
 func (l *Logger) ClearPlayerFilter() {
 	l.playerFilter = make(map[string]bool)
 }
 
-// shouldLog checks if an event involving these players should be logged
+// shouldLog returns true if logging is enabled and any of the given players
+// pass the filter (or if no filter is set).
 func (l *Logger) shouldLog(players ...string) bool {
 	if !l.enabled {
 		return false
 	}
-	// If no filter set, log everything
 	if len(l.playerFilter) == 0 {
 		return true
 	}
-	// Check if any of the players are in the filter
 	for _, p := range players {
 		if l.playerFilter[p] {
 			return true
@@ -72,7 +80,7 @@ func (l *Logger) shouldLog(players ...string) bool {
 	return false
 }
 
-// LogKill logs a kill event with eco adjustment details
+// LogKill logs a kill event with equipment values and economic impact.
 func (l *Logger) LogKill(round int, killer, victim string, killerEquip, victimEquip int, killValue float64) {
 	if !l.shouldLog(killer, victim) {
 		return
@@ -89,7 +97,7 @@ func (l *Logger) LogKill(round int, killer, victim string, killerEquip, victimEq
 	l.logger.Printf("└────────────────────────────────────────────────────────")
 }
 
-// LogDeath logs a death event with eco adjustment details
+// LogDeath logs a death event with equipment values and penalty calculation.
 func (l *Logger) LogDeath(round int, victim, killer string, victimEquip, killerEquip int, deathPenalty float64) {
 	if !l.shouldLog(victim, killer) {
 		return
@@ -106,7 +114,7 @@ func (l *Logger) LogDeath(round int, victim, killer string, victimEquip, killerE
 	l.logger.Printf("└────────────────────────────────────────────────────────")
 }
 
-// LogRoundStart logs the start of a new round
+// LogRoundStart logs the beginning of a new round.
 func (l *Logger) LogRoundStart(round int) {
 	if !l.enabled {
 		return
@@ -117,7 +125,7 @@ func (l *Logger) LogRoundStart(round int) {
 	l.logger.Printf("══════════════════════════════════════════════════════════")
 }
 
-// LogRoundEnd logs the end of a round with summary
+// LogRoundEnd logs the end of a round.
 func (l *Logger) LogRoundEnd(round int) {
 	if !l.enabled {
 		return
@@ -128,7 +136,7 @@ func (l *Logger) LogRoundEnd(round int) {
 	l.logger.Printf("")
 }
 
-// LogTrade logs a trade kill
+// LogTrade logs a trade kill (avenging a teammate's death within the trade window).
 func (l *Logger) LogTrade(round int, trader, tradedPlayer, originalKiller string) {
 	if !l.shouldLog(trader, tradedPlayer, originalKiller) {
 		return
@@ -139,7 +147,7 @@ func (l *Logger) LogTrade(round int, trader, tradedPlayer, originalKiller string
 	l.logger.Printf("└────────────────────────────────────────────────────────")
 }
 
-// LogOpeningKill logs an opening kill
+// LogOpeningKill logs the first kill of a round.
 func (l *Logger) LogOpeningKill(round int, killer, victim string) {
 	if !l.shouldLog(killer, victim) {
 		return
@@ -149,7 +157,7 @@ func (l *Logger) LogOpeningKill(round int, killer, victim string) {
 	l.logger.Printf("└────────────────────────────────────────────────────────")
 }
 
-// LogMultiKill logs a multi-kill at round end
+// LogMultiKill logs a multi-kill round (2K, 3K, 4K, or ACE).
 func (l *Logger) LogMultiKill(round int, player string, kills int) {
 	if !l.shouldLog(player) {
 		return
@@ -170,7 +178,7 @@ func (l *Logger) LogMultiKill(round int, player string, kills int) {
 	l.logger.Printf("└────────────────────────────────────────────────────────")
 }
 
-// LogPlayerSummary logs a player's final stats summary
+// LogPlayerSummary logs end-of-game statistics for a player.
 func (l *Logger) LogPlayerSummary(name string, kills, deaths, damage int, ecoKillValue, ecoDeathValue, finalRating float64) {
 	if !l.shouldLog(name) {
 		return
@@ -182,7 +190,7 @@ func (l *Logger) LogPlayerSummary(name string, kills, deaths, damage int, ecoKil
 	l.logger.Printf("└────────────────────────────────────────────────────────")
 }
 
-// LogBombPlant logs a bomb plant event
+// LogBombPlant logs a bomb plant event.
 func (l *Logger) LogBombPlant(round int, planter string) {
 	if !l.shouldLog(planter) {
 		return
@@ -192,7 +200,7 @@ func (l *Logger) LogBombPlant(round int, planter string) {
 	l.logger.Printf("└────────────────────────────────────────────────────────")
 }
 
-// LogBombDefuse logs a bomb defuse event
+// LogBombDefuse logs a bomb defuse event.
 func (l *Logger) LogBombDefuse(round int, defuser string) {
 	if !l.shouldLog(defuser) {
 		return
@@ -202,7 +210,7 @@ func (l *Logger) LogBombDefuse(round int, defuser string) {
 	l.logger.Printf("└────────────────────────────────────────────────────────")
 }
 
-// LogKnifeRound logs that a knife round was detected and skipped
+// LogKnifeRound logs detection of a knife round (stats not tracked).
 func (l *Logger) LogKnifeRound() {
 	if !l.enabled {
 		return
@@ -210,7 +218,7 @@ func (l *Logger) LogKnifeRound() {
 	l.logger.Printf("⚔️  KNIFE ROUND DETECTED - Skipping stats tracking")
 }
 
-// LogWarmup logs that warmup is being skipped
+// LogWarmup logs detection of warmup period (stats not tracked).
 func (l *Logger) LogWarmup() {
 	if !l.enabled {
 		return
@@ -218,6 +226,7 @@ func (l *Logger) LogWarmup() {
 	l.logger.Printf("🔥 WARMUP DETECTED - Skipping stats tracking")
 }
 
+// getEcoType returns a descriptive string for the economic advantage of a kill.
 func getEcoType(ratio float64) string {
 	if ratio > 4.0 {
 		return "🎯 PISTOL VS RIFLE (1.80x bonus)"
@@ -238,6 +247,7 @@ func getEcoType(ratio float64) string {
 	}
 }
 
+// getDeathType returns a descriptive string for the economic context of a death.
 func getDeathType(ratio float64) string {
 	if ratio > 4.0 {
 		return "💀 DIED TO PISTOL WITH RIFLE (1.60x penalty)"
@@ -258,6 +268,7 @@ func getDeathType(ratio float64) string {
 	}
 }
 
+// max returns the larger of two integers.
 func max(a, b int) int {
 	if a > b {
 		return a
@@ -265,22 +276,22 @@ func max(a, b int) int {
 	return b
 }
 
-// Disable turns off logging
+// Disable turns off logging.
 func (l *Logger) Disable() {
 	l.enabled = false
 }
 
-// Enable turns on logging
+// Enable turns on logging.
 func (l *Logger) Enable() {
 	l.enabled = true
 }
 
-// SetEnabled sets the logging state
+// SetEnabled sets the logging state.
 func (l *Logger) SetEnabled(enabled bool) {
 	l.enabled = enabled
 }
 
-// Printf logs a formatted message if enabled
+// Printf logs a formatted message if logging is enabled.
 func (l *Logger) Printf(format string, v ...interface{}) {
 	if l.enabled {
 		l.logger.Printf(format, v...)

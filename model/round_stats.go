@@ -1,100 +1,92 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// =============================================================================
+
+// Package model defines the core data structures for player and round statistics.
+
 package model
 
+// RoundStats tracks a player's performance within a single round.
+// This struct is populated during demo parsing and used to calculate
+// per-round metrics like round swing, KAST, and clutch statistics.
 type RoundStats struct {
-	Kills      int
-	Assists    int
-	Damage     int
-	Survived   bool
-	Traded     bool
-	GotKill    bool
-	GotAssist  bool
-	EconImpact float64
-
-	// AWP specific stats
-	AWPKills       int
-	AWPOpeningKill bool // Got opening kill with AWP
-
-	// Round Swing tracking
-	TeamWon      bool // Did this player's team win the round?
-	PlayersAlive int  // How many teammates alive at round end (including self if survived)
-	EnemiesAlive int  // How many enemies alive at round end
-	WasLastAlive bool // Was this player the last alive (clutch situation)?
-	ClutchKills  int  // Kills while last alive
-
-	// Advanced Round Swing factors
-	PlantedBomb    bool // Did this player plant the bomb?
-	DefusedBomb    bool // Did this player defuse the bomb?
-	OpeningKill    bool // Did this player get the opening kill?
-	OpeningDeath   bool // Did this player die first?
-	MultiKillRound int  // Number of kills in this round (for multi-kill detection)
-	EntryFragger   bool // Got first kill of the round for their team
-	ClutchAttempt  bool // Was in a clutch situation (1vX)
-	ClutchWon      bool // Won a clutch situation
-	ClutchSize     int  // Size of clutch (1v1, 1v2, etc.) - the number of enemies
-	SavedWeapons   bool // Survived a lost round (weapon save)
-	EcoKill        bool // Got a kill while on eco/force buy
-	AntiEcoKill    bool // Got killed by eco while on full buy
-	FlashAssists   int  // Number of flash assists this round
-	TradeKill      bool // Got a trade kill
-	TradeDeath     bool // Death was traded by teammate
-	FailedTrades   int  // Number of times player failed to trade a nearby teammate
-	TradeDenials   int  // Number of kills where player survived the trade window (wasn't traded)
-
-	// Support stats
-	SavedByTeammate bool // Was saved by a teammate this round
-	SavedTeammate   bool // Saved a teammate this round
-	IsSupportRound  bool // Had assist or flash assist this round
-
-	// Opening duel tracking
-	InvolvedInOpening bool // Was involved in the first duel (killer or victim)
-
-	// New Round Swing factors
-	UtilityDamage      int       // Damage dealt via grenades (HE, molotov, incendiary)
-	UtilityKills       int       // Kills with utility this round
-	SmokeDamage        int       // Damage dealt through smoke
-	DeathTime          float64   // Time of death relative to round start (seconds)
-	TimeAlive          float64   // Time alive in this round (seconds)
-	KillTimes          []float64 // Times of each kill relative to round start
-	TradeSpeed         float64   // Time between teammate death and trade kill (seconds)
-	IsExitFrag         bool      // Kill happened after round was decided
-	ExitFrags          int       // Number of exit frags this round
-	TeamFlashCount     int       // Number of times flashed teammates
-	TeamFlashDuration  float64   // Total duration of team flashes
-	FlashesThrown      int       // Number of flashes thrown this round
-	EnemyFlashDuration float64   // Total duration enemies were flashed
-	AWPKill            bool      // Got a kill with AWP this round
-	KnifeKill          bool      // Got a knife kill this round
-	PistolVsRifleKill  bool      // Got a pistol kill vs rifle
-	HadAWP             bool      // Player had AWP this round
-	LostAWP            bool      // Died with AWP (lost the weapon)
-
-	// Pistol round tracking
-	IsPistolRound bool // Is this a pistol round (round 1 or 13)
-
-	// Side tracking
-	PlayerSide string // "T" or "CT" - which side player is on this round
+	Kills              int
+	Assists            int
+	Damage             int
+	Survived           bool
+	Traded             bool
+	GotKill            bool
+	GotAssist          bool
+	EconImpact         float64
+	AWPKills           int
+	AWPOpeningKill     bool
+	TeamWon            bool
+	PlayersAlive       int
+	EnemiesAlive       int
+	WasLastAlive       bool
+	ClutchKills        int
+	PlantedBomb        bool
+	DefusedBomb        bool
+	OpeningKill        bool
+	OpeningDeath       bool
+	MultiKillRound     int
+	EntryFragger       bool
+	ClutchAttempt      bool
+	ClutchWon          bool
+	ClutchSize         int
+	SavedWeapons       bool
+	EcoKill            bool
+	AntiEcoKill        bool
+	FlashAssists       int
+	TradeKill          bool
+	TradeDeath         bool
+	FailedTrades       int
+	TradeDenials       int
+	SavedByTeammate    bool
+	SavedTeammate      bool
+	IsSupportRound     bool
+	InvolvedInOpening  bool
+	UtilityDamage      int
+	UtilityKills       int
+	SmokeDamage        int
+	DeathTime          float64
+	TimeAlive          float64
+	KillTimes          []float64
+	TradeSpeed         float64
+	IsExitFrag         bool
+	ExitFrags          int
+	TeamFlashCount     int
+	TeamFlashDuration  float64
+	FlashesThrown      int
+	EnemyFlashDuration float64
+	AWPKill            bool
+	KnifeKill          bool
+	PistolVsRifleKill  bool
+	HadAWP             bool
+	LostAWP            bool
+	IsPistolRound      bool
+	PlayerSide         string
 }
 
-// RoundContext provides situational information for round swing calculation
+// RoundContext provides contextual information about the round state.
+// This is used by the round swing calculator to adjust impact values
+// based on round importance, score differential, and game situation.
 type RoundContext struct {
 	RoundNumber     int
-	TotalPlayers    int     // Total players alive at round start
-	BombPlanted     bool    // Was bomb planted this round
-	BombDefused     bool    // Was bomb defused this round
-	RoundType       string  // "pistol", "eco", "force", "full"
-	TimeRemaining   float64 // Time left when round ended
-	IsOvertimeRound bool    // Is this an overtime round
-	MapSide         string  // "T" or "CT"
-
-	// Score context for round importance
-	TeamScore       int     // Current team score before this round
-	EnemyScore      int     // Current enemy score before this round
-	ScoreDiff       int     // Team score - Enemy score (positive = winning)
-	IsMatchPoint    bool    // Either team is at match point
-	IsCloseGame     bool    // Score difference <= 3
-	RoundImportance float64 // Multiplier based on score context (1.0 = normal)
-
-	// Round outcome context
-	RoundDecided   bool    // Round outcome is already determined
-	RoundDecidedAt float64 // Time when round was decided
+	TotalPlayers    int
+	BombPlanted     bool
+	BombDefused     bool
+	RoundType       string
+	TimeRemaining   float64
+	IsOvertimeRound bool
+	MapSide         string
+	TeamScore       int
+	EnemyScore      int
+	ScoreDiff       int
+	IsMatchPoint    bool
+	IsCloseGame     bool
+	RoundImportance float64
+	RoundDecided    bool
+	RoundDecidedAt  float64
 }

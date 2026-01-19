@@ -1,3 +1,11 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// =============================================================================
+
+// Package parser provides CS2 demo file parsing functionality.
+// This file implements the round swing calculation algorithm, which measures
+// a player's impact on round outcomes based on their actions, timing, and context.
 package parser
 
 import (
@@ -5,15 +13,23 @@ import (
 	"math"
 )
 
-// CalculateAdvancedRoundSwing computes context-aware round swing based on player actions and situational factors
+// CalculateAdvancedRoundSwing computes a player's impact score for a single round.
+// The algorithm considers:
+// - Base swing from round outcome and involvement level
+// - Performance contribution (kills, damage, assists, survival)
+// - Situational bonuses (opening kills, trades, entry fragging)
+// - Impact actions (bomb plant/defuse, eco kills)
+// - Economy modifiers (equipment advantage/disadvantage)
+// - Multi-kill bonuses
+// - Clutch performance
+// - Utility impact (flashes, grenades)
+// - Penalties (team flashes, failed trades, early deaths, exit frags)
+//
+// Returns a value typically between -0.30 and +0.40 per round.
 func CalculateAdvancedRoundSwing(roundStats *model.RoundStats, context *model.RoundContext, playerEquipValue float64, teamEquipValue float64) float64 {
-	// === Participation-Weighted Team Bonus ===
-	// Team bonus is small, scaled by involvement (0..1)
-	// Heavy participants get most of it; uninvolved players get near-zero
 	const baseWin = 0.04
 	const baseLoss = -0.04
 
-	// Calculate involvement: kills + assists*0.5 + min(1, damage/150) + plant + defuse + survived*0.5
 	involvement := float64(roundStats.Kills)
 	involvement += float64(roundStats.Assists) * 0.5
 	involvement += math.Min(1.0, float64(roundStats.Damage)/150.0)
@@ -26,7 +42,7 @@ func CalculateAdvancedRoundSwing(roundStats *model.RoundStats, context *model.Ro
 	if roundStats.Survived {
 		involvement += 0.5
 	}
-	involvement = math.Max(0.0, math.Min(involvement/4.0, 1.0)) // Clamp to 0..1
+	involvement = math.Max(0.0, math.Min(involvement/4.0, 1.0))
 
 	var baseSwing float64
 	if roundStats.TeamWon {
@@ -35,159 +51,116 @@ func CalculateAdvancedRoundSwing(roundStats *model.RoundStats, context *model.Ro
 		baseSwing = baseLoss * involvement
 	}
 
-	// === Performance Contribution ===
 	performanceBonus := calculatePerformanceContribution(roundStats)
-
-	// === Situational Modifiers ===
 	situationalBonus := calculateSituationalBonus(roundStats, context)
-
-	// === Impact Actions ===
 	impactBonus := calculateImpactActions(roundStats, context)
-
-	// === Economy Context ===
 	economyModifier := calculateEconomyModifier(roundStats, playerEquipValue, teamEquipValue, context.RoundType)
-
-	// === Multi-kill Scaling ===
 	multiKillBonus := calculateMultiKillBonus(roundStats)
-
-	// === Clutch Situations ===
 	clutchModifier := calculateClutchModifier(roundStats)
-
-	// === NEW: Utility Impact ===
 	utilityBonus := calculateUtilityImpact(roundStats)
-
-	// === NEW: Trade Speed Bonus ===
 	tradeSpeedBonus := calculateTradeSpeedBonus(roundStats)
-
-	// === NEW: Exit Frag Penalty ===
 	exitFragPenalty := calculateExitFragPenalty(roundStats)
-
-	// === NEW: Death Timing Penalty ===
 	deathTimingPenalty := calculateDeathTimingPenalty(roundStats)
-
-	// === NEW: Team Flash Penalty ===
 	teamFlashPenalty := calculateTeamFlashPenalty(roundStats)
-
-	// === NEW: Failed Trade Penalty ===
 	failedTradePenalty := calculateFailedTradePenalty(roundStats)
-
-	// === NEW: Weapon-Based Adjustments ===
 	weaponBonus := calculateWeaponBonus(roundStats)
 
-	// Combine all factors
 	totalSwing := baseSwing + performanceBonus + situationalBonus + impactBonus + multiKillBonus + clutchModifier +
 		utilityBonus + tradeSpeedBonus - exitFragPenalty - deathTimingPenalty - teamFlashPenalty - failedTradePenalty + weaponBonus
 
-	// Apply economy modifier as multiplier
 	totalSwing *= economyModifier
-
-	// === NEW: Score Differential Modifier ===
 	totalSwing *= context.RoundImportance
 
-	// Clamp to reasonable range (expanded slightly for new factors)
 	return math.Max(-0.30, math.Min(0.40, totalSwing))
 }
 
-// calculatePerformanceContribution calculates swing based on kills, damage, and survival
+// calculatePerformanceContribution computes the base performance score from
+// kills, damage, assists, and survival status.
 func calculatePerformanceContribution(roundStats *model.RoundStats) float64 {
 	contribution := 0.0
 
-	// Kill contribution with diminishing returns
 	if roundStats.Kills > 0 {
 		contribution += float64(roundStats.Kills) * 0.04
-		// Bonus for multiple kills
 		if roundStats.Kills >= 2 {
 			contribution += float64(roundStats.Kills-1) * 0.02
 		}
 	}
 
-	// Damage contribution (normalized) - exclude exit frag damage
 	effectiveDamage := roundStats.Damage
 	if roundStats.IsExitFrag {
-		effectiveDamage = int(float64(effectiveDamage) * 0.5) // Reduce exit frag damage contribution
+		effectiveDamage = int(float64(effectiveDamage) * 0.5)
 	}
-	damageContrib := float64(effectiveDamage) / 400.0 // 400 damage = 0.1 swing
+	damageContrib := float64(effectiveDamage) / 400.0
 	contribution += math.Min(damageContrib, 0.08)
 
-	// Assist contribution
 	contribution += float64(roundStats.Assists) * 0.015
-
-	// Flash assist contribution
 	contribution += float64(roundStats.FlashAssists) * 0.01
 
-	// Survival bonus (context-dependent)
 	if roundStats.Survived {
 		if roundStats.TeamWon {
-			contribution += 0.02 // Small bonus for surviving a won round
+			contribution += 0.02
 		} else {
-			contribution += 0.04 // Larger bonus for surviving a lost round (save)
+			contribution += 0.04
 			roundStats.SavedWeapons = true
 		}
 	} else {
-		// Death penalty - dying costs the team
 		if roundStats.TradeDeath {
-			contribution -= 0.04 // Traded death - reduced penalty (team recovered)
+			contribution -= 0.04
 		} else {
-			contribution -= 0.08 // Untraded death - significant penalty (team lost numbers)
+			contribution -= 0.08
 		}
 	}
 
 	return contribution
 }
 
-// calculateSituationalBonus calculates swing based on round context and timing
+// calculateSituationalBonus adds bonuses/penalties for opening kills, trades,
+// entry fragging, and round type (pistol, eco, force).
 func calculateSituationalBonus(roundStats *model.RoundStats, context *model.RoundContext) float64 {
 	bonus := 0.0
 
-	// Opening kill/death impact
 	if roundStats.OpeningKill {
-		bonus += 0.06 // Strong bonus for opening kills
+		bonus += 0.06
 		if context.RoundType == "pistol" {
-			bonus += 0.02 // Extra bonus for pistol round opening kills
+			bonus += 0.02
 		}
 	}
 
-	// Untraded opening death is much worse than traded opening death
 	if roundStats.OpeningDeath {
 		if roundStats.TradeDeath {
-			bonus -= 0.04 // Opening death but traded - moderate penalty (team recovered but lost tempo)
+			bonus -= 0.04
 		} else {
-			bonus -= 0.15 // Untraded opening death - severe penalty (team lost numbers with no trade)
+			bonus -= 0.15
 		}
 	}
 
-	// Entry fragging bonus
 	if roundStats.EntryFragger {
 		bonus += 0.04
 	}
 
-	// Trade kill/death impact (base bonus, speed bonus calculated separately)
 	if roundStats.TradeKill {
-		bonus += 0.02 // Base bonus for trading teammates
+		bonus += 0.02
 	}
 
 	if roundStats.TradeDeath {
-		bonus += 0.015 // Small bonus if death was traded (team play)
+		bonus += 0.015
 	}
 
-	// Trade denial bonus - survived the trade window after getting a kill
 	if roundStats.TradeDenials > 0 {
-		bonus += float64(roundStats.TradeDenials) * 0.04 // Reward for not being traded
+		bonus += float64(roundStats.TradeDenials) * 0.04
 	}
 
-	// Round type modifiers
 	switch context.RoundType {
 	case "pistol":
-		bonus *= 1.3 // Pistol rounds are more impactful
+		bonus *= 1.3
 	case "eco":
 		if roundStats.TeamWon {
-			bonus *= 1.4 // Eco wins are very impactful
+			bonus *= 1.4
 		}
 	case "force":
-		bonus *= 1.1 // Force buy rounds slightly more impactful
+		bonus *= 1.1
 	}
 
-	// Overtime rounds are more valuable
 	if context.IsOvertimeRound {
 		bonus *= 1.2
 	}
@@ -195,80 +168,76 @@ func calculateSituationalBonus(roundStats *model.RoundStats, context *model.Roun
 	return bonus
 }
 
-// calculateImpactActions calculates swing for high-impact actions like bomb plants/defuses
+// calculateImpactActions rewards bomb plants/defuses and eco kills,
+// while penalizing anti-eco deaths.
 func calculateImpactActions(roundStats *model.RoundStats, context *model.RoundContext) float64 {
 	bonus := 0.0
 
-	// Bomb plant bonus
 	if roundStats.PlantedBomb {
 		bonus += 0.08
 		if context.TimeRemaining < 30.0 {
-			bonus += 0.02 // Extra bonus for late plants
+			bonus += 0.02
 		}
 	}
 
-	// Bomb defuse bonus
 	if roundStats.DefusedBomb {
 		bonus += 0.10
 		if context.TimeRemaining < 10.0 {
-			bonus += 0.03 // Extra bonus for clutch defuses
+			bonus += 0.03
 		}
 	}
 
-	// Anti-eco performance
 	if roundStats.EcoKill {
-		bonus += 0.04 // Bonus for getting eco kills
+		bonus += 0.04
 	}
 
 	if roundStats.AntiEcoKill {
-		bonus -= 0.10 // Penalty for dying to eco (embarrassing death)
+		bonus -= 0.10
 	}
 
 	return bonus
 }
 
-// calculateMultiKillBonus calculates exponential bonus for multi-kills
+// calculateMultiKillBonus returns bonus points for multi-kill rounds.
+// 2K=0.03, 3K=0.08, 4K=0.15, 5K(ACE)=0.25
 func calculateMultiKillBonus(roundStats *model.RoundStats) float64 {
 	if roundStats.MultiKillRound < 2 {
 		return 0.0
 	}
 
-	// Exponential scaling for multi-kills
 	switch roundStats.MultiKillRound {
 	case 2:
-		return 0.03 // Double kill
+		return 0.03
 	case 3:
-		return 0.08 // Triple kill
+		return 0.08
 	case 4:
-		return 0.15 // Quadruple kill
+		return 0.15
 	case 5:
-		return 0.25 // Ace
+		return 0.25
 	default:
 		return 0.0
 	}
 }
 
-// calculateClutchModifier calculates swing for clutch situations
+// calculateClutchModifier rewards successful clutches and partially rewards
+// clutch attempts based on kills achieved.
 func calculateClutchModifier(roundStats *model.RoundStats) float64 {
 	modifier := 0.0
 
 	if roundStats.ClutchAttempt {
 		if roundStats.ClutchWon {
-			// Clutch win bonus scales with difficulty
 			switch {
 			case roundStats.ClutchKills >= 4:
-				modifier += 0.20 // 1v4+ clutch
+				modifier += 0.20
 			case roundStats.ClutchKills >= 3:
-				modifier += 0.15 // 1v3 clutch
+				modifier += 0.15
 			case roundStats.ClutchKills >= 2:
-				modifier += 0.10 // 1v2 clutch
+				modifier += 0.10
 			default:
-				modifier += 0.06 // 1v1 clutch
+				modifier += 0.06
 			}
 		} else {
-			// Small penalty for failed clutch, but reward the attempt
 			modifier -= 0.02
-			// Bonus for kills in failed clutch
 			modifier += float64(roundStats.ClutchKills) * 0.02
 		}
 	}
@@ -276,185 +245,164 @@ func calculateClutchModifier(roundStats *model.RoundStats) float64 {
 	return modifier
 }
 
-// determineRoundType determines the economic context of the round
+// determineRoundType categorizes a round as pistol, eco, force, or full buy
+// based on the round number.
 func determineRoundType(roundNumber int) string {
 	switch {
-	case roundNumber == 1 || roundNumber == 16: // Pistol rounds
+	case roundNumber == 1 || roundNumber == 16:
 		return "pistol"
-	case roundNumber <= 3 || (roundNumber >= 16 && roundNumber <= 18): // Early rounds often eco
+	case roundNumber <= 3 || (roundNumber >= 16 && roundNumber <= 18):
 		return "eco"
-	case roundNumber%3 == 0: // Every 3rd round might be force
+	case roundNumber%3 == 0:
 		return "force"
 	default:
 		return "full"
 	}
 }
 
-// calculateEconomyModifier calculates multiplier based on equipment context
+// calculateEconomyModifier adjusts swing based on equipment advantage/disadvantage.
+// Rewards performance when under-equipped, penalizes poor performance when over-equipped.
 func calculateEconomyModifier(roundStats *model.RoundStats, playerEquip, teamEquip float64, roundType string) float64 {
 	modifier := 1.0
 
-	// Equipment disadvantage/advantage
 	avgTeamEquip := teamEquip / 5.0
 	equipRatio := playerEquip / math.Max(avgTeamEquip, 500.0)
 
 	if equipRatio < 0.5 {
-		// Player on eco/save
 		if roundStats.TeamWon {
-			modifier *= 1.3 // Eco wins are impressive
+			modifier *= 1.3
 		}
 		if roundStats.Kills > 0 {
-			modifier *= 1.2 // Eco frags are valuable
+			modifier *= 1.2
 		}
 	} else if equipRatio > 1.5 {
-		// Player with expensive equipment
 		if !roundStats.TeamWon && roundStats.Kills == 0 {
-			modifier *= 0.8 // Penalty for poor performance with good equipment
+			modifier *= 0.8
 		}
 	}
 
-	// Round type economy context
 	switch roundType {
 	case "eco":
 		if roundStats.Kills > 0 {
-			modifier *= 1.4 // Eco frags are very valuable
+			modifier *= 1.4
 		}
 	case "force":
-		modifier *= 1.1 // Force buy performance slightly more valuable
+		modifier *= 1.1
 	}
 
 	return modifier
 }
 
-// === NEW CALCULATION FUNCTIONS ===
-
-// calculateUtilityImpact calculates swing bonus for utility damage and flash impact
+// calculateUtilityImpact rewards effective utility usage (damage, flashes).
 func calculateUtilityImpact(roundStats *model.RoundStats) float64 {
 	bonus := 0.0
 
-	// Utility damage contribution (HE, molotov, incendiary)
 	if roundStats.UtilityDamage > 0 {
-		// Scale utility damage: 100 damage = 0.03 swing
 		utilityContrib := float64(roundStats.UtilityDamage) / 100.0 * 0.03
-		bonus += math.Min(utilityContrib, 0.06) // Cap at 0.06
+		bonus += math.Min(utilityContrib, 0.06)
 	}
 
-	// Enemy flash duration contribution - rewards effective flashes
 	if roundStats.EnemyFlashDuration > 0 {
-		// Scale: 3 seconds of enemy flash = 0.02 swing
 		flashContrib := roundStats.EnemyFlashDuration / 3.0 * 0.02
-		bonus += math.Min(flashContrib, 0.04) // Cap at 0.04
+		bonus += math.Min(flashContrib, 0.04)
 	}
 
-	// Flash assist contribution
 	if roundStats.FlashAssists > 0 {
-		bonus += float64(roundStats.FlashAssists) * 0.015 // 0.015 per flash assist
+		bonus += float64(roundStats.FlashAssists) * 0.015
 	}
 
 	return bonus
 }
 
-// calculateTradeSpeedBonus calculates bonus for fast trades
+// calculateTradeSpeedBonus rewards fast trades (killing the enemy who killed a teammate).
+// Faster trades receive higher bonuses.
 func calculateTradeSpeedBonus(roundStats *model.RoundStats) float64 {
 	if !roundStats.TradeKill || roundStats.TradeSpeed <= 0 {
 		return 0.0
 	}
 
-	// Fast trades (< 2 seconds) get full bonus
-	// Trades between 2-5 seconds get partial bonus
-	// Trades > 5 seconds get minimal bonus
 	switch {
 	case roundStats.TradeSpeed < 2.0:
-		return 0.025 // Fast trade bonus
+		return 0.025
 	case roundStats.TradeSpeed < 3.0:
-		return 0.015 // Medium trade bonus
+		return 0.015
 	case roundStats.TradeSpeed < 5.0:
-		return 0.008 // Slow trade bonus
+		return 0.008
 	default:
-		return 0.0 // Too slow to count as meaningful trade
+		return 0.0
 	}
 }
 
-// calculateExitFragPenalty calculates penalty for exit frags (kills after round decided)
+// calculateExitFragPenalty penalizes kills that occur after the round is decided
+// (exit frags have less impact on round outcome).
 func calculateExitFragPenalty(roundStats *model.RoundStats) float64 {
 	if !roundStats.IsExitFrag {
 		return 0.0
 	}
 
-	// Exit frags are worth less - reduce the kill contribution
-	// Penalty scales with number of exit frags
 	return float64(roundStats.ExitFrags) * 0.02
 }
 
-// calculateDeathTimingPenalty calculates penalty for early deaths
+// calculateDeathTimingPenalty penalizes early deaths more heavily than late deaths.
+// Dying in the first 15 seconds is most penalized.
 func calculateDeathTimingPenalty(roundStats *model.RoundStats) float64 {
 	if roundStats.Survived || roundStats.DeathTime <= 0 {
 		return 0.0
 	}
 
-	// Early deaths are very punishing - you leave your team in a disadvantage
-	// Deaths after bomb plant are less punishing
 	switch {
 	case roundStats.DeathTime < 15.0:
-		return 0.08 // Very early death - severe penalty (dying before anything happens)
+		return 0.08
 	case roundStats.DeathTime < 30.0:
-		return 0.05 // Early death - strong penalty
+		return 0.05
 	case roundStats.DeathTime < 60.0:
-		return 0.02 // Mid-round death - moderate penalty
+		return 0.02
 	default:
-		return 0.0 // Late death - no additional penalty
+		return 0.0
 	}
 }
 
-// calculateTeamFlashPenalty calculates penalty for flashing teammates
+// calculateTeamFlashPenalty penalizes flashing teammates.
 func calculateTeamFlashPenalty(roundStats *model.RoundStats) float64 {
 	if roundStats.TeamFlashCount == 0 {
 		return 0.0
 	}
 
-	// Penalty based on number of team flashes and duration
-	// Team flashing is a significant mistake that can cost rounds
 	countPenalty := float64(roundStats.TeamFlashCount) * 0.02
-	durationPenalty := roundStats.TeamFlashDuration * 0.008 // Per second of team flash
+	durationPenalty := roundStats.TeamFlashDuration * 0.008
 
-	return math.Min(countPenalty+durationPenalty, 0.10) // Cap at 0.10
+	return math.Min(countPenalty+durationPenalty, 0.10)
 }
 
-// calculateFailedTradePenalty calculates penalty for failing to trade nearby teammates
+// calculateFailedTradePenalty penalizes failing to trade a nearby teammate's death.
 func calculateFailedTradePenalty(roundStats *model.RoundStats) float64 {
 	if roundStats.FailedTrades == 0 {
 		return 0.0
 	}
 
-	// Failing to trade a nearby teammate is a significant mistake
-	// You were in position to help but didn't get the refrag
-	return float64(roundStats.FailedTrades) * 0.08 // 0.08 penalty per failed trade
+	return float64(roundStats.FailedTrades) * 0.08
 }
 
-// calculateWeaponBonus calculates bonus/penalty for weapon-specific achievements
+// calculateWeaponBonus rewards/penalizes based on weapon-specific performance.
+// AWP kills are rewarded, losing an AWP without a kill is penalized.
+// Knife kills and pistol vs rifle kills receive bonuses.
 func calculateWeaponBonus(roundStats *model.RoundStats) float64 {
 	bonus := 0.0
 
-	// AWP performance - high-risk, high-reward weapon
 	if roundStats.AWPKill {
 		if roundStats.LostAWP {
-			// Got a kill but lost the AWP - reduced reward (still losing economy)
 			bonus += 0.005
 		} else {
-			// Got a kill and kept the AWP - full reward
 			bonus += 0.02
 		}
 	} else if roundStats.LostAWP {
-		// No kill and lost the AWP - significant penalty
 		bonus -= 0.05
 	}
 
-	// Knife kills - humiliation bonus
 	if roundStats.KnifeKill {
 		bonus += 0.03
 	}
 
-	// Pistol vs rifle kills - skill bonus
 	if roundStats.PistolVsRifleKill {
 		bonus += 0.025
 	}

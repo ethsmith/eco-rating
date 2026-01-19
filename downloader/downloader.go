@@ -1,3 +1,10 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// =============================================================================
+
+// Package downloader handles downloading and extracting CS2 demo files from URLs.
+// It supports caching (skipping already downloaded files) and automatic zip extraction.
 package downloader
 
 import (
@@ -11,37 +18,33 @@ import (
 	"strings"
 )
 
-// Downloader handles downloading and extracting demo files
+// Downloader manages downloading and extracting demo files to a local directory.
 type Downloader struct {
-	OutputDir string
+	OutputDir string // Directory where downloaded and extracted files are stored
 }
 
-// NewDownloader creates a new downloader
+// NewDownloader creates a new Downloader with the specified output directory.
 func NewDownloader(outputDir string) *Downloader {
 	return &Downloader{OutputDir: outputDir}
 }
 
-// DownloadResult contains information about a downloaded demo
+// DownloadResult contains information about a completed download operation.
 type DownloadResult struct {
-	URL      string
-	ZipPath  string
-	DemoPath string
-	Error    error
+	URL      string // Original URL that was downloaded
+	ZipPath  string // Local path to the downloaded zip file
+	DemoPath string // Local path to the extracted .dem file
+	Error    error  // Any error that occurred during download
 }
 
-// Download downloads a file from the given URL and saves it to the output directory
+// Download fetches a file from the given URL and saves it to the output directory.
+// If the file already exists locally, it skips the download (caching behavior).
 func (d *Downloader) Download(url string) (*DownloadResult, error) {
-	// Ensure output directory exists
 	if err := os.MkdirAll(d.OutputDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create output directory: %w", err)
 	}
-
-	// Extract filename from URL
 	parts := strings.Split(url, "/")
 	filename := parts[len(parts)-1]
 	zipPath := filepath.Join(d.OutputDir, filename)
-
-	// Check if already downloaded
 	if info, err := os.Stat(zipPath); err == nil {
 		log.Printf("    Zip already exists: %s (%.2f MB)", filename, float64(info.Size())/(1024*1024))
 		return &DownloadResult{
@@ -51,8 +54,6 @@ func (d *Downloader) Download(url string) (*DownloadResult, error) {
 	}
 
 	log.Printf("    Downloading: %s", filename)
-
-	// Download the file
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("failed to download %s: %w", url, err)
@@ -62,20 +63,14 @@ func (d *Downloader) Download(url string) (*DownloadResult, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code %d for %s", resp.StatusCode, url)
 	}
-
-	// Log expected size if available
 	if resp.ContentLength > 0 {
 		log.Printf("    Size: %.2f MB", float64(resp.ContentLength)/(1024*1024))
 	}
-
-	// Create the output file
 	out, err := os.Create(zipPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create file %s: %w", zipPath, err)
 	}
 	defer out.Close()
-
-	// Copy with progress tracking
 	written, err := io.Copy(out, resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to write file %s: %w", zipPath, err)
@@ -89,9 +84,9 @@ func (d *Downloader) Download(url string) (*DownloadResult, error) {
 	}, nil
 }
 
-// Extract extracts a zip file and returns the path to the .dem file
+// Extract opens a zip file and extracts the first .dem file found.
+// If the demo is already extracted, it returns the existing path.
 func (d *Downloader) Extract(zipPath string) (string, error) {
-	// Open the zip file
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to open zip file %s: %w", zipPath, err)
@@ -99,24 +94,17 @@ func (d *Downloader) Extract(zipPath string) (string, error) {
 	defer r.Close()
 
 	log.Printf("    Zip contains %d files", len(r.File))
-
-	// Find and extract the .dem file
 	for _, f := range r.File {
 		log.Printf("    Found in zip: %s (%.2f MB)", f.Name, float64(f.UncompressedSize64)/(1024*1024))
 
 		if strings.HasSuffix(f.Name, ".dem") {
-			// Extract directly to output directory (no subdirectory)
 			demoPath := filepath.Join(d.OutputDir, filepath.Base(f.Name))
-
-			// Check if already extracted
 			if info, err := os.Stat(demoPath); err == nil {
 				log.Printf("    Demo already extracted: %s (%.2f MB)", filepath.Base(demoPath), float64(info.Size())/(1024*1024))
 				return demoPath, nil
 			}
 
 			log.Printf("    Extracting: %s", filepath.Base(f.Name))
-
-			// Extract the file
 			rc, err := f.Open()
 			if err != nil {
 				return "", fmt.Errorf("failed to open file in zip: %w", err)
@@ -144,7 +132,8 @@ func (d *Downloader) Extract(zipPath string) (string, error) {
 	return "", fmt.Errorf("no .dem file found in %s", zipPath)
 }
 
-// DownloadAndExtract downloads a zip file and extracts the demo
+// DownloadAndExtract is a convenience method that downloads and extracts in one call.
+// Returns the path to the extracted .dem file.
 func (d *Downloader) DownloadAndExtract(url string) (string, error) {
 	result, err := d.Download(url)
 	if err != nil {
@@ -159,7 +148,8 @@ func (d *Downloader) DownloadAndExtract(url string) (string, error) {
 	return demoPath, nil
 }
 
-// Cleanup removes downloaded zip files (keeps extracted demos)
+// Cleanup removes all .zip files from the output directory.
+// This can be called after processing to free up disk space.
 func (d *Downloader) Cleanup() error {
 	entries, err := os.ReadDir(d.OutputDir)
 	if err != nil {

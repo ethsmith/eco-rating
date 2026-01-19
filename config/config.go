@@ -1,3 +1,10 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// =============================================================================
+
+// Package config handles application configuration loading, saving, and validation.
+// It supports JSON configuration files and provides sensible defaults for all settings.
 package config
 
 import (
@@ -6,56 +13,34 @@ import (
 	"strings"
 )
 
+// Config holds all application configuration settings.
+// These can be set via JSON config file or command-line flags.
 type Config struct {
-	// Cumulative mode - when true, fetches all demos from specified tier across all combine days
-	Cumulative bool `json:"cumulative"`
-
-	// Tier to filter demos by (e.g., "contender", "challenger", "elite", "premier", "prospect", "recruit")
-	Tier string `json:"tier"`
-
-	// Base URL for the S3 bucket
-	BaseURL string `json:"base_url"`
-
-	// Prefix for the combines folder (e.g., "s19/Combines/")
-	Prefix string `json:"prefix"`
-
-	// Output directory for downloaded demos
-	OutputDir string `json:"output_dir"`
-
-	// Path to a single demo file (used when cumulative=false)
-	DemoPath string `json:"demo_path"`
-
-	// Enable logging during parsing
-	EnableLogging bool `json:"enable_logging"`
-
-	// Enable CS Demo Manager integration (analyze + heatmaps)
-	EnableCsdm bool `json:"enable_csdm"`
-
-	// Output directory for generated heatmaps
-	HeatmapPath string `json:"heatmap_path"`
-
-	// Google Sheets integration
-	StatsSheetURL  string `json:"stats_sheet_url"`
-	StatsSheetName string `json:"stats_sheet_name"`
-	UploadToSheet  bool   `json:"upload_to_sheet"`
+	Cumulative    bool   `json:"cumulative"`     // Enable batch processing mode
+	Tier          string `json:"tier"`           // Competitive tier filter (comma-separated for multiple)
+	BaseURL       string `json:"base_url"`       // Cloud bucket base URL
+	Prefix        string `json:"prefix"`         // Bucket prefix for demo files
+	DemoPath      string `json:"demo_path"`      // Path to single demo file (single mode)
+	DemoDir       string `json:"demo_dir"`       // Local directory for downloaded demos
+	EnableLogging bool   `json:"enable_logging"` // Enable detailed parsing logs
 }
 
-// DefaultConfig returns a config with sensible defaults
+// DefaultConfig returns a Config with sensible default values.
+// The defaults point to the CSC demo bucket for season 19 combines.
 func DefaultConfig() *Config {
 	return &Config{
 		Cumulative:    false,
 		Tier:          "",
 		BaseURL:       "https://cscdemos.nyc3.digitaloceanspaces.com/",
 		Prefix:        "s19/Combines/",
-		OutputDir:     "./demos",
 		DemoPath:      "",
+		DemoDir:       "./demos",
 		EnableLogging: true,
-		EnableCsdm:    true,
-		HeatmapPath:   "./heatmaps",
 	}
 }
 
-// LoadConfig loads configuration from a JSON file
+// LoadConfig reads configuration from a JSON file at the given path.
+// If the file doesn't exist, it returns default configuration.
 func LoadConfig(path string) (*Config, error) {
 	cfg := DefaultConfig()
 
@@ -74,7 +59,7 @@ func LoadConfig(path string) (*Config, error) {
 	return cfg, nil
 }
 
-// SaveConfig saves the configuration to a JSON file
+// SaveConfig writes the configuration to a JSON file with pretty formatting.
 func SaveConfig(cfg *Config, path string) error {
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
@@ -83,7 +68,8 @@ func SaveConfig(cfg *Config, path string) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-// ValidTiers returns the list of valid tier names
+// ValidTiers returns the list of valid competitive tier names.
+// Tiers are ordered from highest to lowest skill level.
 func ValidTiers() []string {
 	return []string{
 		"challenger",
@@ -95,7 +81,7 @@ func ValidTiers() []string {
 	}
 }
 
-// IsValidTier checks if the given tier is valid
+// IsValidTier checks if the given tier name is a recognized competitive tier.
 func IsValidTier(tier string) bool {
 	for _, t := range ValidTiers() {
 		if t == tier {
@@ -105,12 +91,14 @@ func IsValidTier(tier string) bool {
 	return false
 }
 
-// DemoPrefix returns the prefix used to filter demo files for a given tier
+// DemoPrefix returns the filename prefix used for demos of a given tier.
+// Demo files are named like "combine-contender-map-timestamp.dem.zip".
 func DemoPrefix(tier string) string {
 	return "combine-" + tier
 }
 
-// ParseTiers splits a comma-separated tier string into individual tiers
+// ParseTiers splits a comma-separated tier string into individual tier names.
+// It trims whitespace and filters out empty strings.
 func ParseTiers(tierStr string) []string {
 	if tierStr == "" {
 		return nil
