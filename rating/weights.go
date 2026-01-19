@@ -14,10 +14,10 @@ package rating
 // Baseline values represent average/expected performance levels.
 // These are used to normalize metrics so that average performance = 1.0 contribution.
 const (
-	BaselineKPR  = 0.7  // Average kills per round
-	BaselineDPR  = 0.7  // Average deaths per round
-	BaselineADR  = 75.0 // Average damage per round
-	BaselineKAST = 0.70 // KAST percentage (Kill/Assist/Survive/Trade)
+	BaselineKPR  = 0.72 // Average kills per round
+	BaselineDPR  = 0.68 // Average deaths per round
+	BaselineADR  = 77.0 // Average damage per round
+	BaselineKAST = 0.72 // KAST percentage (Kill/Assist/Survive/Trade)
 )
 
 // Economic kill value multipliers - rewards kills against better-equipped opponents.
@@ -74,7 +74,7 @@ const (
 
 	// KPR contribution multipliers (asymmetric - rewards high KPR more)
 	KPRContribAbove = 0.75 // Multiplier when KPR >= baseline
-	KPRContribBelow = 0.55 // Multiplier when KPR < baseline
+	KPRContribBelow = 0.70 // Multiplier when KPR < baseline
 
 	// DPR contribution multipliers (asymmetric - penalizes high DPR more)
 	DPRContribBelow = 0.15 // Multiplier when DPR <= baseline (good)
@@ -82,7 +82,7 @@ const (
 
 	// ADR contribution multipliers
 	ADRContribAbove = 0.015 // Multiplier when ADR >= baseline
-	ADRContribBelow = 0.004 // Multiplier when ADR < baseline
+	ADRContribBelow = 0.012 // Multiplier when ADR < baseline
 
 	// KAST contribution multipliers
 	KASTContribAbove = 0.20 // Multiplier when KAST >= baseline
