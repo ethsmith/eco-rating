@@ -89,8 +89,8 @@ const (
 	KASTContribBelow = 0.35 // Multiplier when KAST < baseline
 
 	// Round swing contribution multipliers
-	SwingContribPositive = 0.75 // Multiplier for positive swing
-	SwingContribNegative = 1.00 // Multiplier for negative swing
+	SwingContribPositive = 1.40 // Multiplier for positive swing
+	SwingContribNegative = 1.40 // Multiplier for negative swing
 
 	// Impact contribution weights
 	OpeningKillImpactWeight = 0.3   // Weight for opening kills per round
