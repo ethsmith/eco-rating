@@ -39,46 +39,46 @@ func ComputeFinalRating(p *model.PlayerStats) float64 {
 	multiKillRoundsPerRound := float64(p.RoundsWithMultiKill) / rounds
 
 	var kprContrib float64
-	if kpr >= 0.7 {
-		kprContrib = (kpr - 0.7) * 0.75
+	if kpr >= BaselineKPR {
+		kprContrib = (kpr - BaselineKPR) * KPRContribAbove
 	} else {
-		kprContrib = (kpr - 0.7) * 0.55
+		kprContrib = (kpr - BaselineKPR) * KPRContribBelow
 	}
 
 	var dprContrib float64
-	if dpr <= 0.7 {
-		dprContrib = (0.7 - dpr) * 0.15
+	if dpr <= BaselineDPR {
+		dprContrib = (BaselineDPR - dpr) * DPRContribBelow
 	} else {
-		dprContrib = (0.7 - dpr) * 0.55
+		dprContrib = (BaselineDPR - dpr) * DPRContribAbove
 	}
 
 	var adrContrib float64
-	if adr >= 75.0 {
-		adrContrib = (adr - 75.0) * 0.015
+	if adr >= BaselineADR {
+		adrContrib = (adr - BaselineADR) * ADRContribAbove
 	} else {
-		adrContrib = (adr - 75.0) * 0.004
+		adrContrib = (adr - BaselineADR) * ADRContribBelow
 	}
 
 	var kastContrib float64
-	if kast >= 0.70 {
-		kastContrib = (kast - 0.70) * 0.20
+	if kast >= BaselineKAST {
+		kastContrib = (kast - BaselineKAST) * KASTContribAbove
 	} else {
-		kastContrib = (kast - 0.70) * 0.35
+		kastContrib = (kast - BaselineKAST) * KASTContribBelow
 	}
 
 	var swingContrib float64
 	if avgSwing >= 0 {
-		swingContrib = avgSwing * 0.75
+		swingContrib = avgSwing * SwingContribPositive
 	} else {
-		swingContrib = avgSwing * 1.00
+		swingContrib = avgSwing * SwingContribNegative
 	}
 
-	impactContrib := openingKillsPerRound*0.3 + multiKillRoundsPerRound*0.15
+	impactContrib := openingKillsPerRound*OpeningKillImpactWeight + multiKillRoundsPerRound*MultiKillImpactWeight
 
 	multiKillBonus := float64(sumMulti(p.MultiKillsRaw)) / rounds
-	multiContrib := multiKillBonus * 0.015
+	multiContrib := multiKillBonus * MultiKillContrib
 
-	rating := 1.0 + kprContrib + dprContrib + adrContrib + kastContrib + swingContrib + impactContrib + multiContrib
+	rating := RatingBaseline + kprContrib + dprContrib + adrContrib + kastContrib + swingContrib + impactContrib + multiContrib
 
 	return math.Max(MinRating, math.Min(MaxRating, rating))
 }
@@ -112,44 +112,44 @@ func ComputeSideRating(rounds int, kills int, deaths int, damage int, ecoKillVal
 	avgSwing := roundSwing / roundsF
 
 	var kprContrib float64
-	if kpr >= 0.7 {
-		kprContrib = (kpr - 0.7) * 0.75
+	if kpr >= BaselineKPR {
+		kprContrib = (kpr - BaselineKPR) * KPRContribAbove
 	} else {
-		kprContrib = (kpr - 0.7) * 0.55
+		kprContrib = (kpr - BaselineKPR) * KPRContribBelow
 	}
 
 	var dprContrib float64
-	if dpr <= 0.7 {
-		dprContrib = (0.7 - dpr) * 0.15
+	if dpr <= BaselineDPR {
+		dprContrib = (BaselineDPR - dpr) * DPRContribBelow
 	} else {
-		dprContrib = (0.7 - dpr) * 0.55
+		dprContrib = (BaselineDPR - dpr) * DPRContribAbove
 	}
 
 	var adrContrib float64
-	if adr >= 75.0 {
-		adrContrib = (adr - 75.0) * 0.015
+	if adr >= BaselineADR {
+		adrContrib = (adr - BaselineADR) * ADRContribAbove
 	} else {
-		adrContrib = (adr - 75.0) * 0.004
+		adrContrib = (adr - BaselineADR) * ADRContribBelow
 	}
 
 	var kastContrib float64
-	if kastPct >= 0.70 {
-		kastContrib = (kastPct - 0.70) * 0.20
+	if kastPct >= BaselineKAST {
+		kastContrib = (kastPct - BaselineKAST) * KASTContribAbove
 	} else {
-		kastContrib = (kastPct - 0.70) * 0.35
+		kastContrib = (kastPct - BaselineKAST) * KASTContribBelow
 	}
 
 	var swingContrib float64
 	if avgSwing >= 0 {
-		swingContrib = avgSwing * 0.75
+		swingContrib = avgSwing * SwingContribPositive
 	} else {
-		swingContrib = avgSwing * 1.00
+		swingContrib = avgSwing * SwingContribNegative
 	}
 
 	multiKillBonus := float64(sumMulti(multiKills)) / roundsF
-	multiContrib := multiKillBonus * 0.015
+	multiContrib := multiKillBonus * MultiKillContrib
 
-	rating := 1.0 + kprContrib + dprContrib + adrContrib + kastContrib + swingContrib + multiContrib
+	rating := RatingBaseline + kprContrib + dprContrib + adrContrib + kastContrib + swingContrib + multiContrib
 
 	return math.Max(MinRating, math.Min(MaxRating, rating))
 }

@@ -170,7 +170,6 @@ func (d *DemoParser) registerHandlers() {
 		}
 
 		currentTick := d.parser.CurrentFrame()
-		const tradeWindow = 64 * 5
 
 		currentTime := float64(currentTick) / 64.0
 		timeInRound := currentTime - d.state.RoundStartTime
@@ -201,7 +200,7 @@ func (d *DemoParser) registerHandlers() {
 						dy := victimPos.Y - teammatePos.Y
 						distance := math.Sqrt(dx*dx + dy*dy)
 
-						if distance < 1200.0 {
+						if distance < rating.TradeProximityUnits {
 							pt := pendingTrade{
 								KillerID:           a.SteamID64,
 								KillerTeam:         a.Team,
@@ -219,7 +218,7 @@ func (d *DemoParser) registerHandlers() {
 
 		if a != nil && v != nil {
 			if recent, ok := d.state.RecentKills[v.SteamID64]; ok {
-				if recent.VictimTeam == a.Team && currentTick-recent.Tick <= tradeWindow {
+				if recent.VictimTeam == a.Team && currentTick-recent.Tick <= rating.TradeWindowTicks {
 					if tradedRound, exists := d.state.Round[recent.VictimID]; exists {
 						tradedRound.Traded = true
 						tradedRound.SavedByTeammate = true
@@ -252,7 +251,7 @@ func (d *DemoParser) registerHandlers() {
 			var remainingPending []pendingTrade
 			expiredCount := 0
 			for _, pt := range pendingList {
-				if currentTick-pt.DeathTick > tradeWindow {
+				if currentTick-pt.DeathTick > rating.TradeWindowTicks {
 					if roundStats, exists := d.state.Round[pt.TeammateID]; exists {
 						roundStats.FailedTrades++
 					}
@@ -364,7 +363,7 @@ func (d *DemoParser) registerHandlers() {
 		}
 
 		if recent, ok := d.state.RecentKills[v.SteamID64]; ok {
-			if recent.VictimTeam == a.Team && currentTick-recent.Tick <= tradeWindow {
+			if recent.VictimTeam == a.Team && currentTick-recent.Tick <= rating.TradeWindowTicks {
 				round.TradeKill = true
 				if deathTime, exists := d.state.RecentTeamDeaths[recent.VictimID]; exists {
 					round.TradeSpeed = timeInRound - deathTime
@@ -461,11 +460,10 @@ func (d *DemoParser) registerHandlers() {
 		winnerTeam := e.Winner
 
 		currentTick := d.parser.CurrentFrame()
-		const tradeWindow = 64 * 5
 
 		for _, pendingList := range d.state.PendingTrades {
 			for _, pt := range pendingList {
-				if currentTick-pt.DeathTick > tradeWindow {
+				if currentTick-pt.DeathTick > rating.TradeWindowTicks {
 					if roundStats, exists := d.state.Round[pt.TeammateID]; exists {
 						roundStats.FailedTrades++
 					}

@@ -320,10 +320,6 @@ func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName stri
 // This includes per-round rates, percentages, HLTV ratings, and side-specific ratings.
 // Must be called after all games have been added and before exporting results.
 func (a *Aggregator) Finalize() {
-	avgKPR := 0.679
-	avgSPR := 0.317
-	avgRMK := 1.277
-
 	for _, agg := range a.Players {
 		if agg.RoundsPlayed > 0 {
 			rounds := float64(agg.RoundsPlayed)
@@ -338,12 +334,12 @@ func (a *Aggregator) Finalize() {
 			agg.Survival = agg.Survival / rounds
 			agg.KAST = agg.KAST / rounds
 			agg.EconImpact = agg.EconImpact / rounds
-			killRating := agg.KPR / avgKPR
+			killRating := agg.KPR / rating.HLTVBaselineKPR
 			survived := agg.Survival * rounds
-			survivalRating := ((survived - float64(agg.Deaths)) / rounds) / avgSPR
+			survivalRating := ((survived - float64(agg.Deaths)) / rounds) / rating.HLTVBaselineSPR
 			rmkPoints := float64(agg.MultiKills.OneK*1 + agg.MultiKills.TwoK*4 + agg.MultiKills.ThreeK*9 + agg.MultiKills.FourK*16 + agg.MultiKills.FiveK*25)
-			rmkRating := (rmkPoints / rounds) / avgRMK
-			agg.HLTVRating = (killRating + 0.7*survivalRating + rmkRating) / 2.7
+			rmkRating := (rmkPoints / rounds) / rating.HLTVBaselineRMK
+			agg.HLTVRating = (killRating + rating.HLTVSurvivalWeight*survivalRating + rmkRating) / rating.HLTVRatingDivisor
 			agg.RoundsWithKillPct = float64(agg.RoundsWithKill) / rounds
 			agg.RoundsWithMultiKillPct = float64(agg.RoundsWithMultiKill) / rounds
 			agg.SavedByTeammatePerRound = float64(agg.SavedByTeammate) / rounds
@@ -399,22 +395,22 @@ func (a *Aggregator) Finalize() {
 		if agg.PistolRoundsPlayed > 0 {
 			pistolRounds := float64(agg.PistolRoundsPlayed)
 			pistolKPR := float64(agg.PistolRoundKills) / pistolRounds
-			pistolSurvivalRating := ((float64(agg.PistolRoundSurvivals) - float64(agg.PistolRoundDeaths)) / pistolRounds) / avgSPR
+			pistolSurvivalRating := ((float64(agg.PistolRoundSurvivals) - float64(agg.PistolRoundDeaths)) / pistolRounds) / rating.HLTVBaselineSPR
 			pistolRMKPoints := float64(agg.PistolRoundMultiKills) * 4.0
-			pistolRMKRating := (pistolRMKPoints / pistolRounds) / avgRMK
+			pistolRMKRating := (pistolRMKPoints / pistolRounds) / rating.HLTVBaselineRMK
 
-			pistolKillRating := pistolKPR / avgKPR
-			agg.PistolRoundRating = (pistolKillRating + 0.7*pistolSurvivalRating + pistolRMKRating) / 2.7
+			pistolKillRating := pistolKPR / rating.HLTVBaselineKPR
+			agg.PistolRoundRating = (pistolKillRating + rating.HLTVSurvivalWeight*pistolSurvivalRating + pistolRMKRating) / rating.HLTVRatingDivisor
 		}
 		if agg.TRoundsPlayed > 0 {
 			tRounds := float64(agg.TRoundsPlayed)
 			tKPR := float64(agg.TKills) / tRounds
-			tSurvivalRating := ((float64(agg.TSurvivals) - float64(agg.TDeaths)) / tRounds) / avgSPR
+			tSurvivalRating := ((float64(agg.TSurvivals) - float64(agg.TDeaths)) / tRounds) / rating.HLTVBaselineSPR
 			tRMKPoints := float64(agg.tMultiKills[1]*1 + agg.tMultiKills[2]*4 + agg.tMultiKills[3]*9 + agg.tMultiKills[4]*16 + agg.tMultiKills[5]*25)
-			tRMKRating := (tRMKPoints / tRounds) / avgRMK
+			tRMKRating := (tRMKPoints / tRounds) / rating.HLTVBaselineRMK
 
-			tKillRating := tKPR / avgKPR
-			agg.TRating = (tKillRating + 0.7*tSurvivalRating + tRMKRating) / 2.7
+			tKillRating := tKPR / rating.HLTVBaselineKPR
+			agg.TRating = (tKillRating + rating.HLTVSurvivalWeight*tSurvivalRating + tRMKRating) / rating.HLTVRatingDivisor
 			agg.TEcoRating = rating.ComputeSideRating(
 				agg.TRoundsPlayed, agg.TKills, agg.TDeaths, agg.TDamage, agg.TEcoKillValue,
 				agg.TRoundSwing, agg.TKAST, agg.tMultiKills, agg.TClutchRounds, agg.TClutchWins)
@@ -422,12 +418,12 @@ func (a *Aggregator) Finalize() {
 		if agg.CTRoundsPlayed > 0 {
 			ctRounds := float64(agg.CTRoundsPlayed)
 			ctKPR := float64(agg.CTKills) / ctRounds
-			ctSurvivalRating := ((float64(agg.CTSurvivals) - float64(agg.CTDeaths)) / ctRounds) / avgSPR
+			ctSurvivalRating := ((float64(agg.CTSurvivals) - float64(agg.CTDeaths)) / ctRounds) / rating.HLTVBaselineSPR
 			ctRMKPoints := float64(agg.ctMultiKills[1]*1 + agg.ctMultiKills[2]*4 + agg.ctMultiKills[3]*9 + agg.ctMultiKills[4]*16 + agg.ctMultiKills[5]*25)
-			ctRMKRating := (ctRMKPoints / ctRounds) / avgRMK
+			ctRMKRating := (ctRMKPoints / ctRounds) / rating.HLTVBaselineRMK
 
-			ctKillRating := ctKPR / avgKPR
-			agg.CTRating = (ctKillRating + 0.7*ctSurvivalRating + ctRMKRating) / 2.7
+			ctKillRating := ctKPR / rating.HLTVBaselineKPR
+			agg.CTRating = (ctKillRating + rating.HLTVSurvivalWeight*ctSurvivalRating + ctRMKRating) / rating.HLTVRatingDivisor
 			agg.CTEcoRating = rating.ComputeSideRating(
 				agg.CTRoundsPlayed, agg.CTKills, agg.CTDeaths, agg.CTDamage, agg.CTEcoKillValue,
 				agg.CTRoundSwing, agg.CTKAST, agg.ctMultiKills, agg.CTClutchRounds, agg.CTClutchWins)

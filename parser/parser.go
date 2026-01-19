@@ -84,49 +84,45 @@ func (d *DemoParser) Parse() {
 				p.AWPKillsPerRound = float64(p.AWPKills) / rounds
 			}
 
-			avgKPR := 0.679
-			avgSPR := 0.317
-			avgRMK := 1.277
-
-			killRating := p.KPR / avgKPR
+			killRating := p.KPR / rating.HLTVBaselineKPR
 			survived := p.Survival * rounds
-			survivalRating := ((survived - float64(p.Deaths)) / rounds) / avgSPR
+			survivalRating := ((survived - float64(p.Deaths)) / rounds) / rating.HLTVBaselineSPR
 			rmkPoints := float64(p.MultiKillsRaw[1]*1 + p.MultiKillsRaw[2]*4 + p.MultiKillsRaw[3]*9 + p.MultiKillsRaw[4]*16 + p.MultiKillsRaw[5]*25)
-			rmkRating := (rmkPoints / rounds) / avgRMK
+			rmkRating := (rmkPoints / rounds) / rating.HLTVBaselineRMK
 
-			p.HLTVRating = (killRating + 0.7*survivalRating + rmkRating) / 2.7
+			p.HLTVRating = (killRating + rating.HLTVSurvivalWeight*survivalRating + rmkRating) / rating.HLTVRatingDivisor
 
 			if p.PistolRoundsPlayed > 0 {
 				pistolRounds := float64(p.PistolRoundsPlayed)
 				pistolKPR := float64(p.PistolRoundKills) / pistolRounds
-				pistolSurvivalRating := ((float64(p.PistolRoundSurvivals) - float64(p.PistolRoundDeaths)) / pistolRounds) / avgSPR
+				pistolSurvivalRating := ((float64(p.PistolRoundSurvivals) - float64(p.PistolRoundDeaths)) / pistolRounds) / rating.HLTVBaselineSPR
 				pistolRMKPoints := float64(p.PistolRoundMultiKills) * 4.0
-				pistolRMKRating := (pistolRMKPoints / pistolRounds) / avgRMK
+				pistolRMKRating := (pistolRMKPoints / pistolRounds) / rating.HLTVBaselineRMK
 
-				pistolKillRating := pistolKPR / avgKPR
-				p.PistolRoundRating = (pistolKillRating + 0.7*pistolSurvivalRating + pistolRMKRating) / 2.7
+				pistolKillRating := pistolKPR / rating.HLTVBaselineKPR
+				p.PistolRoundRating = (pistolKillRating + rating.HLTVSurvivalWeight*pistolSurvivalRating + pistolRMKRating) / rating.HLTVRatingDivisor
 			}
 
 			if p.TRoundsPlayed > 0 {
 				tRounds := float64(p.TRoundsPlayed)
 				tKPR := float64(p.TKills) / tRounds
-				tSurvivalRating := ((float64(p.TSurvivals) - float64(p.TDeaths)) / tRounds) / avgSPR
+				tSurvivalRating := ((float64(p.TSurvivals) - float64(p.TDeaths)) / tRounds) / rating.HLTVBaselineSPR
 				tRMKPoints := float64(p.TMultiKills[1]*1 + p.TMultiKills[2]*4 + p.TMultiKills[3]*9 + p.TMultiKills[4]*16 + p.TMultiKills[5]*25)
-				tRMKRating := (tRMKPoints / tRounds) / avgRMK
+				tRMKRating := (tRMKPoints / tRounds) / rating.HLTVBaselineRMK
 
-				tKillRating := tKPR / avgKPR
-				p.TRating = (tKillRating + 0.7*tSurvivalRating + tRMKRating) / 2.7
+				tKillRating := tKPR / rating.HLTVBaselineKPR
+				p.TRating = (tKillRating + rating.HLTVSurvivalWeight*tSurvivalRating + tRMKRating) / rating.HLTVRatingDivisor
 			}
 
 			if p.CTRoundsPlayed > 0 {
 				ctRounds := float64(p.CTRoundsPlayed)
 				ctKPR := float64(p.CTKills) / ctRounds
-				ctSurvivalRating := ((float64(p.CTSurvivals) - float64(p.CTDeaths)) / ctRounds) / avgSPR
+				ctSurvivalRating := ((float64(p.CTSurvivals) - float64(p.CTDeaths)) / ctRounds) / rating.HLTVBaselineSPR
 				ctRMKPoints := float64(p.CTMultiKills[1]*1 + p.CTMultiKills[2]*4 + p.CTMultiKills[3]*9 + p.CTMultiKills[4]*16 + p.CTMultiKills[5]*25)
-				ctRMKRating := (ctRMKPoints / ctRounds) / avgRMK
+				ctRMKRating := (ctRMKPoints / ctRounds) / rating.HLTVBaselineRMK
 
-				ctKillRating := ctKPR / avgKPR
-				p.CTRating = (ctKillRating + 0.7*ctSurvivalRating + ctRMKRating) / 2.7
+				ctKillRating := ctKPR / rating.HLTVBaselineKPR
+				p.CTRating = (ctKillRating + rating.HLTVSurvivalWeight*ctSurvivalRating + ctRMKRating) / rating.HLTVRatingDivisor
 			}
 
 			p.TimeAlivePerRound = p.TotalTimeAlive / rounds

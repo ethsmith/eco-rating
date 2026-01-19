@@ -10,6 +10,7 @@ package parser
 
 import (
 	"eco-rating/model"
+	"eco-rating/rating"
 	"math"
 )
 
@@ -27,28 +28,25 @@ import (
 //
 // Returns a value typically between -0.30 and +0.40 per round.
 func CalculateAdvancedRoundSwing(roundStats *model.RoundStats, context *model.RoundContext, playerEquipValue float64, teamEquipValue float64) float64 {
-	const baseWin = 0.04
-	const baseLoss = -0.04
-
 	involvement := float64(roundStats.Kills)
-	involvement += float64(roundStats.Assists) * 0.5
-	involvement += math.Min(1.0, float64(roundStats.Damage)/150.0)
+	involvement += float64(roundStats.Assists) * rating.InvolvementAssistWeight
+	involvement += math.Min(1.0, float64(roundStats.Damage)/rating.InvolvementDamageNorm)
 	if roundStats.PlantedBomb {
-		involvement += 1.0
+		involvement += rating.InvolvementBombWeight
 	}
 	if roundStats.DefusedBomb {
-		involvement += 1.0
+		involvement += rating.InvolvementBombWeight
 	}
 	if roundStats.Survived {
-		involvement += 0.5
+		involvement += rating.InvolvementSurvivalWeight
 	}
-	involvement = math.Max(0.0, math.Min(involvement/4.0, 1.0))
+	involvement = math.Max(0.0, math.Min(involvement/rating.InvolvementNormDivisor, 1.0))
 
 	var baseSwing float64
 	if roundStats.TeamWon {
-		baseSwing = baseWin * involvement
+		baseSwing = rating.SwingBaseWin * involvement
 	} else {
-		baseSwing = baseLoss * involvement
+		baseSwing = rating.SwingBaseLoss * involvement
 	}
 
 	performanceBonus := calculatePerformanceContribution(roundStats)
@@ -71,7 +69,7 @@ func CalculateAdvancedRoundSwing(roundStats *model.RoundStats, context *model.Ro
 	totalSwing *= economyModifier
 	totalSwing *= context.RoundImportance
 
-	return math.Max(-0.30, math.Min(0.40, totalSwing))
+	return math.Max(rating.SwingMinClamp, math.Min(rating.SwingMaxClamp, totalSwing))
 }
 
 // calculatePerformanceContribution computes the base performance score from
@@ -80,34 +78,34 @@ func calculatePerformanceContribution(roundStats *model.RoundStats) float64 {
 	contribution := 0.0
 
 	if roundStats.Kills > 0 {
-		contribution += float64(roundStats.Kills) * 0.04
+		contribution += float64(roundStats.Kills) * rating.KillContribPerKill
 		if roundStats.Kills >= 2 {
-			contribution += float64(roundStats.Kills-1) * 0.02
+			contribution += float64(roundStats.Kills-1) * rating.KillContribMultiBonus
 		}
 	}
 
 	effectiveDamage := roundStats.Damage
 	if roundStats.IsExitFrag {
-		effectiveDamage = int(float64(effectiveDamage) * 0.5)
+		effectiveDamage = int(float64(effectiveDamage) * rating.ExitFragDamageMultiplier)
 	}
-	damageContrib := float64(effectiveDamage) / 400.0
-	contribution += math.Min(damageContrib, 0.08)
+	damageContrib := float64(effectiveDamage) / rating.DamageContribDivisor
+	contribution += math.Min(damageContrib, rating.DamageContribMax)
 
-	contribution += float64(roundStats.Assists) * 0.015
-	contribution += float64(roundStats.FlashAssists) * 0.01
+	contribution += float64(roundStats.Assists) * rating.AssistContrib
+	contribution += float64(roundStats.FlashAssists) * rating.FlashAssistContrib
 
 	if roundStats.Survived {
 		if roundStats.TeamWon {
-			contribution += 0.02
+			contribution += rating.SurvivalContribWin
 		} else {
-			contribution += 0.04
+			contribution += rating.SurvivalContribLoss
 			roundStats.SavedWeapons = true
 		}
 	} else {
 		if roundStats.TradeDeath {
-			contribution -= 0.04
+			contribution -= rating.DeathPenaltyTraded
 		} else {
-			contribution -= 0.08
+			contribution -= rating.DeathPenaltyUntraded
 		}
 	}
 
@@ -120,49 +118,49 @@ func calculateSituationalBonus(roundStats *model.RoundStats, context *model.Roun
 	bonus := 0.0
 
 	if roundStats.OpeningKill {
-		bonus += 0.06
+		bonus += rating.OpeningKillBonus
 		if context.RoundType == "pistol" {
-			bonus += 0.02
+			bonus += rating.OpeningKillPistolBonus
 		}
 	}
 
 	if roundStats.OpeningDeath {
 		if roundStats.TradeDeath {
-			bonus -= 0.04
+			bonus -= rating.OpeningDeathTraded
 		} else {
-			bonus -= 0.15
+			bonus -= rating.OpeningDeathUntraded
 		}
 	}
 
 	if roundStats.EntryFragger {
-		bonus += 0.04
+		bonus += rating.EntryFragBonus
 	}
 
 	if roundStats.TradeKill {
-		bonus += 0.02
+		bonus += rating.TradeKillBonus
 	}
 
 	if roundStats.TradeDeath {
-		bonus += 0.015
+		bonus += rating.TradeDeathMitigation
 	}
 
 	if roundStats.TradeDenials > 0 {
-		bonus += float64(roundStats.TradeDenials) * 0.04
+		bonus += float64(roundStats.TradeDenials) * rating.TradeDenialBonus
 	}
 
 	switch context.RoundType {
 	case "pistol":
-		bonus *= 1.3
+		bonus *= rating.PistolRoundMultiplier
 	case "eco":
 		if roundStats.TeamWon {
-			bonus *= 1.4
+			bonus *= rating.EcoRoundWinMultiplier
 		}
 	case "force":
-		bonus *= 1.1
+		bonus *= rating.ForceRoundMultiplier
 	}
 
 	if context.IsOvertimeRound {
-		bonus *= 1.2
+		bonus *= rating.OvertimeMultiplier
 	}
 
 	return bonus
@@ -174,25 +172,25 @@ func calculateImpactActions(roundStats *model.RoundStats, context *model.RoundCo
 	bonus := 0.0
 
 	if roundStats.PlantedBomb {
-		bonus += 0.08
-		if context.TimeRemaining < 30.0 {
-			bonus += 0.02
+		bonus += rating.BombPlantBonus
+		if context.TimeRemaining < rating.LateRoundTimeThreshold {
+			bonus += rating.BombPlantLateBonus
 		}
 	}
 
 	if roundStats.DefusedBomb {
-		bonus += 0.10
-		if context.TimeRemaining < 10.0 {
-			bonus += 0.03
+		bonus += rating.BombDefuseBonus
+		if context.TimeRemaining < rating.ClutchDefuseThreshold {
+			bonus += rating.BombDefuseClutchBonus
 		}
 	}
 
 	if roundStats.EcoKill {
-		bonus += 0.04
+		bonus += rating.EcoKillBonus
 	}
 
 	if roundStats.AntiEcoKill {
-		bonus -= 0.10
+		bonus -= rating.AntiEcoDeathPenalty
 	}
 
 	return bonus
@@ -207,13 +205,13 @@ func calculateMultiKillBonus(roundStats *model.RoundStats) float64 {
 
 	switch roundStats.MultiKillRound {
 	case 2:
-		return 0.03
+		return rating.MultiKill2KBonus
 	case 3:
-		return 0.08
+		return rating.MultiKill3KBonus
 	case 4:
-		return 0.15
+		return rating.MultiKill4KBonus
 	case 5:
-		return 0.25
+		return rating.MultiKill5KBonus
 	default:
 		return 0.0
 	}
@@ -228,17 +226,17 @@ func calculateClutchModifier(roundStats *model.RoundStats) float64 {
 		if roundStats.ClutchWon {
 			switch {
 			case roundStats.ClutchKills >= 4:
-				modifier += 0.20
+				modifier += rating.ClutchWin4KBonus
 			case roundStats.ClutchKills >= 3:
-				modifier += 0.15
+				modifier += rating.ClutchWin3KBonus
 			case roundStats.ClutchKills >= 2:
-				modifier += 0.10
+				modifier += rating.ClutchWin2KBonus
 			default:
-				modifier += 0.06
+				modifier += rating.ClutchWin1KBonus
 			}
 		} else {
-			modifier -= 0.02
-			modifier += float64(roundStats.ClutchKills) * 0.02
+			modifier -= rating.ClutchLossPenalty
+			modifier += float64(roundStats.ClutchKills) * rating.ClutchLossKillMitigation
 		}
 	}
 
@@ -266,28 +264,28 @@ func calculateEconomyModifier(roundStats *model.RoundStats, playerEquip, teamEqu
 	modifier := 1.0
 
 	avgTeamEquip := teamEquip / 5.0
-	equipRatio := playerEquip / math.Max(avgTeamEquip, 500.0)
+	equipRatio := playerEquip / math.Max(avgTeamEquip, rating.MinTeamEquipValue)
 
-	if equipRatio < 0.5 {
+	if equipRatio < rating.LowEquipRatioThreshold {
 		if roundStats.TeamWon {
-			modifier *= 1.3
+			modifier *= rating.LowEquipWinMultiplier
 		}
 		if roundStats.Kills > 0 {
-			modifier *= 1.2
+			modifier *= rating.LowEquipKillMultiplier
 		}
-	} else if equipRatio > 1.5 {
+	} else if equipRatio > rating.HighEquipRatioThreshold {
 		if !roundStats.TeamWon && roundStats.Kills == 0 {
-			modifier *= 0.8
+			modifier *= rating.HighEquipFailMultiplier
 		}
 	}
 
 	switch roundType {
 	case "eco":
 		if roundStats.Kills > 0 {
-			modifier *= 1.4
+			modifier *= rating.EcoRoundKillMultiplier
 		}
 	case "force":
-		modifier *= 1.1
+		modifier *= rating.ForceRoundModifier
 	}
 
 	return modifier
@@ -298,17 +296,17 @@ func calculateUtilityImpact(roundStats *model.RoundStats) float64 {
 	bonus := 0.0
 
 	if roundStats.UtilityDamage > 0 {
-		utilityContrib := float64(roundStats.UtilityDamage) / 100.0 * 0.03
-		bonus += math.Min(utilityContrib, 0.06)
+		utilityContrib := float64(roundStats.UtilityDamage) / 100.0 * rating.UtilityDamageContribRate
+		bonus += math.Min(utilityContrib, rating.UtilityDamageContribMax)
 	}
 
 	if roundStats.EnemyFlashDuration > 0 {
-		flashContrib := roundStats.EnemyFlashDuration / 3.0 * 0.02
-		bonus += math.Min(flashContrib, 0.04)
+		flashContrib := roundStats.EnemyFlashDuration / 3.0 * rating.FlashDurationContribRate
+		bonus += math.Min(flashContrib, rating.FlashDurationContribMax)
 	}
 
 	if roundStats.FlashAssists > 0 {
-		bonus += float64(roundStats.FlashAssists) * 0.015
+		bonus += float64(roundStats.FlashAssists) * rating.FlashAssistBonusRate
 	}
 
 	return bonus
@@ -322,12 +320,12 @@ func calculateTradeSpeedBonus(roundStats *model.RoundStats) float64 {
 	}
 
 	switch {
-	case roundStats.TradeSpeed < 2.0:
-		return 0.025
-	case roundStats.TradeSpeed < 3.0:
-		return 0.015
-	case roundStats.TradeSpeed < 5.0:
-		return 0.008
+	case roundStats.TradeSpeed < rating.FastTradeThreshold:
+		return rating.FastTradeBonus
+	case roundStats.TradeSpeed < rating.MediumTradeThreshold:
+		return rating.MediumTradeBonus
+	case roundStats.TradeSpeed < rating.SlowTradeThreshold:
+		return rating.SlowTradeBonus
 	default:
 		return 0.0
 	}
@@ -340,7 +338,7 @@ func calculateExitFragPenalty(roundStats *model.RoundStats) float64 {
 		return 0.0
 	}
 
-	return float64(roundStats.ExitFrags) * 0.02
+	return float64(roundStats.ExitFrags) * rating.ExitFragPenaltyRate
 }
 
 // calculateDeathTimingPenalty penalizes early deaths more heavily than late deaths.
@@ -351,12 +349,12 @@ func calculateDeathTimingPenalty(roundStats *model.RoundStats) float64 {
 	}
 
 	switch {
-	case roundStats.DeathTime < 15.0:
-		return 0.08
-	case roundStats.DeathTime < 30.0:
-		return 0.05
-	case roundStats.DeathTime < 60.0:
-		return 0.02
+	case roundStats.DeathTime < rating.EarlyDeathThreshold:
+		return rating.EarlyDeathPenalty
+	case roundStats.DeathTime < rating.MidDeathThreshold:
+		return rating.MidDeathPenalty
+	case roundStats.DeathTime < rating.LateDeathThreshold:
+		return rating.LateDeathPenalty
 	default:
 		return 0.0
 	}
@@ -368,10 +366,10 @@ func calculateTeamFlashPenalty(roundStats *model.RoundStats) float64 {
 		return 0.0
 	}
 
-	countPenalty := float64(roundStats.TeamFlashCount) * 0.02
-	durationPenalty := roundStats.TeamFlashDuration * 0.008
+	countPenalty := float64(roundStats.TeamFlashCount) * rating.TeamFlashCountPenalty
+	durationPenalty := roundStats.TeamFlashDuration * rating.TeamFlashDurationPenalty
 
-	return math.Min(countPenalty+durationPenalty, 0.10)
+	return math.Min(countPenalty+durationPenalty, rating.TeamFlashPenaltyMax)
 }
 
 // calculateFailedTradePenalty penalizes failing to trade a nearby teammate's death.
@@ -380,7 +378,7 @@ func calculateFailedTradePenalty(roundStats *model.RoundStats) float64 {
 		return 0.0
 	}
 
-	return float64(roundStats.FailedTrades) * 0.08
+	return float64(roundStats.FailedTrades) * rating.FailedTradePenalty
 }
 
 // calculateWeaponBonus rewards/penalizes based on weapon-specific performance.
@@ -391,20 +389,20 @@ func calculateWeaponBonus(roundStats *model.RoundStats) float64 {
 
 	if roundStats.AWPKill {
 		if roundStats.LostAWP {
-			bonus += 0.005
+			bonus += rating.AWPKillBonusWithDeath
 		} else {
-			bonus += 0.02
+			bonus += rating.AWPKillBonusWithSurvive
 		}
 	} else if roundStats.LostAWP {
-		bonus -= 0.05
+		bonus -= rating.AWPLostNokillPenalty
 	}
 
 	if roundStats.KnifeKill {
-		bonus += 0.03
+		bonus += rating.KnifeKillBonus
 	}
 
 	if roundStats.PistolVsRifleKill {
-		bonus += 0.025
+		bonus += rating.PistolVsRifleKillBonus
 	}
 
 	return bonus
