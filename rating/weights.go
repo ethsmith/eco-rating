@@ -81,12 +81,12 @@ const (
 	DPRContribAbove = 0.25 // Multiplier when DPR > baseline (bad)
 
 	// ADR contribution multipliers
-	ADRContribAbove = 0.004 // Multiplier when ADR >= baseline
-	ADRContribBelow = 0.003 // Multiplier when ADR < baseline
+	ADRContribAbove = 0.005 // Multiplier when ADR >= baseline
+	ADRContribBelow = 0.004 // Multiplier when ADR < baseline
 
 	// KAST contribution multipliers
-	KASTContribAbove = 0.10 // Multiplier when KAST >= baseline
-	KASTContribBelow = 0.15 // Multiplier when KAST < baseline
+	KASTContribAbove = 0.20 // Multiplier when KAST >= baseline
+	KASTContribBelow = 0.25 // Multiplier when KAST < baseline
 
 	// Round swing contribution multipliers
 	SwingContribPositive = 1.40 // Multiplier for positive swing
@@ -94,8 +94,8 @@ const (
 
 	// Probability-based swing contribution (HLTV 3.0 style)
 	// ProbabilitySwingPerRound typically ranges from -0.15 to +0.15
-	// A player with +0.10 avg swing gets +0.15 rating boost
-	ProbSwingContribMultiplier = 1.5
+	// A player with +0.10 avg swing gets +0.25 rating boost
+	ProbSwingContribMultiplier = 2.5
 
 	// Impact contribution weights
 	OpeningKillImpactWeight = 0.15  // Weight for opening kills per round

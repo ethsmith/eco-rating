@@ -181,8 +181,17 @@ func (c *Calculator) processRoundEnd(
 	}
 }
 
+// KillSwingResult contains the economy-adjusted swing values for killer and victim.
+type KillSwingResult struct {
+	RawSwing      float64 // Raw probability delta from the kill
+	KillerSwing   float64 // Economy-adjusted swing for the killer (bonus for hard kills)
+	VictimSwing   float64 // Economy-adjusted penalty for the victim (worse for embarrassing deaths)
+	EcoMultiplier float64 // The economy multiplier applied
+}
+
 // CalculateSingleKillSwing computes the swing for a single kill event.
 // Useful for real-time swing calculation during parsing.
+// Returns the raw probability delta (no economy adjustment).
 func (c *Calculator) CalculateSingleKillSwing(
 	state *probability.RoundState,
 	kill *KillEvent,
@@ -200,6 +209,36 @@ func (c *Calculator) CalculateSingleKillSwing(
 	probAfter := c.probEngine.GetWinProbability(stateAfter, kill.KillerSide)
 
 	return probAfter - probBefore
+}
+
+// CalculateKillSwingWithEconomy computes economy-adjusted swing for both killer and victim.
+// - Killer gets bonus for hard kills (pistol vs rifle = 2x multiplier)
+// - Victim gets extra penalty for embarrassing deaths (rifle dying to pistol = 2x penalty)
+func (c *Calculator) CalculateKillSwingWithEconomy(
+	state *probability.RoundState,
+	kill *KillEvent,
+) KillSwingResult {
+	// Get raw probability swing
+	rawSwing := c.CalculateSingleKillSwing(state, kill)
+
+	// Get duel win rate from killer's perspective
+	duelWinRate := c.probEngine.GetDuelWinRate(kill.KillerEquip, kill.VictimEquip)
+
+	// Economy multiplier for killer (hard kills = bonus)
+	killerEcoMult := c.getEconomyMultiplier(duelWinRate)
+
+	// Economy multiplier for victim (embarrassing deaths = extra penalty)
+	// If killer had low win rate, victim had high win rate - dying is embarrassing
+	// victimWinRate = 1 - duelWinRate (from victim's perspective)
+	victimWinRate := 1.0 - duelWinRate
+	victimEcoMult := c.getEconomyMultiplier(victimWinRate)
+
+	return KillSwingResult{
+		RawSwing:      rawSwing,
+		KillerSwing:   rawSwing * killerEcoMult,
+		VictimSwing:   rawSwing * victimEcoMult,
+		EcoMultiplier: killerEcoMult,
+	}
 }
 
 // GetProbabilityEngine returns the underlying probability engine.

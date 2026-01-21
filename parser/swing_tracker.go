@@ -75,16 +75,17 @@ func (st *SwingTracker) RecordFlash(attackerID, victimID uint64, duration float6
 	st.damageTracker.RecordFlash(attackerID, victimID, duration)
 }
 
-// RecordKill records a kill event and returns the probability swing.
+// RecordKill records a kill event and returns economy-adjusted swing values.
+// Returns KillerSwing (with eco bonus for hard kills) and VictimSwing (with eco penalty for embarrassing deaths).
 func (st *SwingTracker) RecordKill(
 	killerID, victimID uint64,
 	killerSide, victimSide common.Team,
 	killerEquip, victimEquip float64,
 	timeInRound float64,
 	isTradeKill, isHeadshot bool,
-) float64 {
+) swing.KillSwingResult {
 	if !st.enabled || st.roundState == nil {
-		return 0
+		return swing.KillSwingResult{}
 	}
 
 	// Build kill event
@@ -104,8 +105,8 @@ func (st *SwingTracker) RecordKill(
 		FlashAssists:        st.damageTracker.GetFlashAssists(victimID),
 	}
 
-	// Calculate swing before updating state
-	swingValue := st.calculator.CalculateSingleKillSwing(st.roundState, killEvent)
+	// Calculate economy-adjusted swing before updating state
+	swingResult := st.calculator.CalculateKillSwingWithEconomy(st.roundState, killEvent)
 
 	// Add event to round events
 	st.roundEvents = append(st.roundEvents, killEvent)
@@ -116,7 +117,7 @@ func (st *SwingTracker) RecordKill(
 	// Clear victim's damage tracking data
 	st.damageTracker.ClearVictimData(victimID)
 
-	return swingValue
+	return swingResult
 }
 
 // RecordBombPlant records a bomb plant event.

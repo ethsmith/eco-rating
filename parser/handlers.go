@@ -495,19 +495,23 @@ func (d *DemoParser) handleKill(e events.Kill) {
 
 	// Track kill swing using probability-based calculator
 	if d.state.SwingTracker != nil {
-		killSwing := d.state.SwingTracker.RecordKill(
+		swingResult := d.state.SwingTracker.RecordKill(
 			a.SteamID64, v.SteamID64,
 			a.Team, v.Team,
 			float64(attackerEquip), float64(victimEquip),
 			timeInRound,
 			isTradeKill, e.IsHeadshot,
 		)
-		round.ProbabilitySwing += killSwing
 
-		// Track eco-adjusted kills
-		duelWinRate := d.state.SwingTracker.GetCalculator().GetProbabilityEngine().GetDuelWinRate(float64(attackerEquip), float64(victimEquip))
-		if duelWinRate > 0 {
-			attacker.EcoAdjustedKills += 0.50 / duelWinRate
+		// Killer gets economy-adjusted swing (bonus for hard kills like pistol vs rifle)
+		round.ProbabilitySwing += swingResult.KillerSwing
+
+		// Victim gets economy-adjusted penalty (extra penalty for embarrassing deaths like rifle dying to pistol)
+		victimRound.ProbabilitySwing -= swingResult.VictimSwing
+
+		// Track eco-adjusted kills using the multiplier
+		if swingResult.EcoMultiplier > 0 {
+			attacker.EcoAdjustedKills += swingResult.EcoMultiplier
 		}
 	}
 
