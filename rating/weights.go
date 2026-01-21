@@ -73,29 +73,31 @@ const (
 	RatingBaseline = 1.0 // Starting point for rating calculation
 
 	// KPR contribution multipliers (asymmetric - rewards high KPR more)
-	KPRContribAbove = 0.75 // Multiplier when KPR >= baseline
-	KPRContribBelow = 0.70 // Multiplier when KPR < baseline
+	KPRContribAbove = 0.35 // Multiplier when KPR >= baseline
+	KPRContribBelow = 0.30 // Multiplier when KPR < baseline
 
 	// DPR contribution multipliers (asymmetric - penalizes high DPR more)
-	DPRContribBelow = 0.15 // Multiplier when DPR <= baseline (good)
-	DPRContribAbove = 0.55 // Multiplier when DPR > baseline (bad)
+	DPRContribBelow = 0.08 // Multiplier when DPR <= baseline (good)
+	DPRContribAbove = 0.25 // Multiplier when DPR > baseline (bad)
 
 	// ADR contribution multipliers
-	ADRContribAbove = 0.015 // Multiplier when ADR >= baseline
-	ADRContribBelow = 0.012 // Multiplier when ADR < baseline
+	ADRContribAbove = 0.005 // Multiplier when ADR >= baseline
+	ADRContribBelow = 0.004 // Multiplier when ADR < baseline
 
 	// KAST contribution multipliers
 	KASTContribAbove = 0.20 // Multiplier when KAST >= baseline
-	KASTContribBelow = 0.35 // Multiplier when KAST < baseline
+	KASTContribBelow = 0.25 // Multiplier when KAST < baseline
 
 	// Round swing contribution multipliers
 	SwingContribPositive = 1.40 // Multiplier for positive swing
 	SwingContribNegative = 1.40 // Multiplier for negative swing
 
+	ProbSwingContribMultiplier = 2.5
+
 	// Impact contribution weights
-	OpeningKillImpactWeight = 0.3   // Weight for opening kills per round
-	MultiKillImpactWeight   = 0.15  // Weight for multi-kill rounds per round
-	MultiKillContrib        = 0.015 // Multi-kill bonus contribution multiplier
+	OpeningKillImpactWeight = 0.15  // Weight for opening kills per round
+	MultiKillImpactWeight   = 0.08  // Weight for multi-kill rounds per round
+	MultiKillContrib        = 0.005 // Multi-kill bonus contribution multiplier
 )
 
 // Round swing calculation constants - used in CalculateAdvancedRoundSwing.

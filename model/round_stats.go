@@ -7,6 +7,18 @@
 
 package model
 
+// DamageContribution tracks damage dealt by a player to a specific victim.
+type DamageContribution struct {
+	PlayerID uint64
+	Damage   int
+}
+
+// FlashAssistInfo tracks flash assist details for a kill.
+type FlashAssistInfo struct {
+	PlayerID uint64
+	Duration float64 // Flash duration in seconds
+}
+
 // RoundStats tracks a player's performance within a single round.
 // This struct is populated during demo parsing and used to calculate
 // per-round metrics like round swing, KAST, and clutch statistics.
@@ -67,6 +79,10 @@ type RoundStats struct {
 	LostAWP            bool
 	IsPistolRound      bool
 	PlayerSide         string
+
+	// Probability-based swing tracking (new for v3.0)
+	ProbabilitySwing float64 // Win probability delta contribution
+	EquipmentValue   float64 // Player's equipment value at round start
 }
 
 // RoundContext provides contextual information about the round state.

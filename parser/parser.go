@@ -14,6 +14,7 @@ import (
 
 	"eco-rating/model"
 	"eco-rating/rating"
+	"eco-rating/rating/probability"
 
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs"
 )
@@ -21,9 +22,10 @@ import (
 // DemoParser wraps the demoinfocs parser and manages match state and logging.
 // It processes CS2 demo files and extracts comprehensive player statistics.
 type DemoParser struct {
-	parser demoinfocs.Parser
-	state  *MatchState
-	logger *Logger
+	parser    demoinfocs.Parser
+	state     *MatchState
+	logger    *Logger
+	collector *probability.DataCollector
 }
 
 // NewDemoParser creates a new DemoParser with logging disabled.
@@ -38,13 +40,19 @@ func NewDemoParserWithLogging(r io.Reader, enableLogging bool) *DemoParser {
 	state := NewMatchState()
 
 	dp := &DemoParser{
-		parser: p,
-		state:  state,
-		logger: NewLogger(enableLogging),
+		parser:    p,
+		state:     state,
+		logger:    NewLogger(enableLogging),
+		collector: probability.NewDataCollector(),
 	}
 
 	dp.registerHandlers()
 	return dp
+}
+
+// GetCollector returns the probability data collector for merging in cumulative mode.
+func (d *DemoParser) GetCollector() *probability.DataCollector {
+	return d.collector
 }
 
 // SetLogging enables or disables detailed parsing logs.
@@ -191,17 +199,30 @@ func (d *DemoParser) computeDerivedStats() {
 		p.MultiKills.FourK = p.MultiKillsRaw[4]
 		p.MultiKills.FiveK = p.MultiKillsRaw[5]
 
+		// Compute probability-based swing metrics
+		if p.RoundsPlayed > 0 {
+			rounds := float64(p.RoundsPlayed)
+			p.ProbabilitySwingPerRound = p.ProbabilitySwing / rounds
+			// SwingRating: scale swing to rating (0% = 1.0, +4% = 1.4, -3% = 0.7)
+			p.SwingRating = 1.0 + (p.ProbabilitySwingPerRound * 10.0)
+			if p.SwingRating < 0.5 {
+				p.SwingRating = 0.5
+			} else if p.SwingRating > 1.5 {
+				p.SwingRating = 1.5
+			}
+		}
+
 		p.FinalRating = rating.ComputeFinalRating(p)
 
 		if p.TRoundsPlayed > 0 {
 			p.TEcoRating = rating.ComputeSideRating(
 				p.TRoundsPlayed, p.TKills, p.TDeaths, p.TDamage, p.TEcoKillValue,
-				p.TRoundSwing, p.TKAST, p.TMultiKills, p.TClutchRounds, p.TClutchWins)
+				p.TProbabilitySwing, p.TKAST, p.TMultiKills, p.TClutchRounds, p.TClutchWins)
 		}
 		if p.CTRoundsPlayed > 0 {
 			p.CTEcoRating = rating.ComputeSideRating(
 				p.CTRoundsPlayed, p.CTKills, p.CTDeaths, p.CTDamage, p.CTEcoKillValue,
-				p.CTRoundSwing, p.CTKAST, p.CTMultiKills, p.CTClutchRounds, p.CTClutchWins)
+				p.CTProbabilitySwing, p.CTKAST, p.CTMultiKills, p.CTClutchRounds, p.CTClutchWins)
 		}
 
 		d.logger.LogPlayerSummary(p.Name, p.Kills, p.Deaths, p.Damage, p.EcoKillValue, p.EcoDeathValue, p.FinalRating)

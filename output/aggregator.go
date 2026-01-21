@@ -63,6 +63,8 @@ type AggregatedStats struct {
 	EcoKillValue               float64        `json:"eco_kill_value"`
 	EcoDeathValue              float64        `json:"eco_death_value"`
 	RoundSwing                 float64        `json:"round_swing"`
+	ProbabilitySwing           float64        `json:"probability_swing"`
+	ProbabilitySwingPerRound   float64        `json:"probability_swing_per_round"`
 	ClutchRounds               int            `json:"clutch_rounds"`
 	ClutchWins                 int            `json:"clutch_wins"`
 	SavedByTeammate            int            `json:"saved_by_teammate"`
@@ -118,6 +120,7 @@ type AggregatedStats struct {
 	TRoundsWithMultiKill       int     `json:"t_rounds_with_multi_kill"`
 	TEcoKillValue              float64 `json:"t_eco_kill_value"`
 	TRoundSwing                float64 `json:"t_round_swing"`
+	TProbabilitySwing          float64 `json:"t_probability_swing"`
 	TKAST                      float64 `json:"t_kast"`
 	TClutchRounds              int     `json:"t_clutch_rounds"`
 	TClutchWins                int     `json:"t_clutch_wins"`
@@ -132,6 +135,7 @@ type AggregatedStats struct {
 	CTRoundsWithMultiKill      int     `json:"ct_rounds_with_multi_kill"`
 	CTEcoKillValue             float64 `json:"ct_eco_kill_value"`
 	CTRoundSwing               float64 `json:"ct_round_swing"`
+	CTProbabilitySwing         float64 `json:"ct_probability_swing"`
 	CTKAST                     float64 `json:"ct_kast"`
 	CTClutchRounds             int     `json:"ct_clutch_rounds"`
 	CTClutchWins               int     `json:"ct_clutch_wins"`
@@ -231,6 +235,7 @@ func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName stri
 		agg.EcoKillValue += p.EcoKillValue
 		agg.EcoDeathValue += p.EcoDeathValue
 		agg.RoundSwing += p.RoundSwing
+		agg.ProbabilitySwing += p.ProbabilitySwing
 		agg.ClutchRounds += p.ClutchRounds
 		agg.ClutchWins += p.ClutchWins
 		agg.SavedByTeammate += p.SavedByTeammate
@@ -280,6 +285,7 @@ func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName stri
 		agg.TRoundsWithMultiKill += p.TRoundsWithMultiKill
 		agg.TEcoKillValue += p.TEcoKillValue
 		agg.TRoundSwing += p.TRoundSwing
+		agg.TProbabilitySwing += p.TProbabilitySwing
 		agg.TKAST += p.TKAST
 		agg.TClutchRounds += p.TClutchRounds
 		agg.TClutchWins += p.TClutchWins
@@ -295,6 +301,7 @@ func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName stri
 		agg.CTRoundsWithMultiKill += p.CTRoundsWithMultiKill
 		agg.CTEcoKillValue += p.CTEcoKillValue
 		agg.CTRoundSwing += p.CTRoundSwing
+		agg.CTProbabilitySwing += p.CTProbabilitySwing
 		agg.CTKAST += p.CTKAST
 		agg.CTClutchRounds += p.CTClutchRounds
 		agg.CTClutchWins += p.CTClutchWins
@@ -334,6 +341,7 @@ func (a *Aggregator) Finalize() {
 			agg.Survival = agg.Survival / rounds
 			agg.KAST = agg.KAST / rounds
 			agg.EconImpact = agg.EconImpact / rounds
+			agg.ProbabilitySwingPerRound = agg.ProbabilitySwing / rounds
 
 			// Calculate HLTV rating using centralized function
 			survivals := int(agg.Survival * rounds)
@@ -410,7 +418,7 @@ func (a *Aggregator) Finalize() {
 				agg.TRoundsPlayed, agg.TKills, agg.TDeaths, agg.TSurvivals, agg.tMultiKills)
 			agg.TEcoRating = rating.ComputeSideRating(
 				agg.TRoundsPlayed, agg.TKills, agg.TDeaths, agg.TDamage, agg.TEcoKillValue,
-				agg.TRoundSwing, agg.TKAST, agg.tMultiKills, agg.TClutchRounds, agg.TClutchWins)
+				agg.TProbabilitySwing, agg.TKAST, agg.tMultiKills, agg.TClutchRounds, agg.TClutchWins)
 		}
 
 		// CT-side ratings using centralized functions
@@ -419,7 +427,7 @@ func (a *Aggregator) Finalize() {
 				agg.CTRoundsPlayed, agg.CTKills, agg.CTDeaths, agg.CTSurvivals, agg.ctMultiKills)
 			agg.CTEcoRating = rating.ComputeSideRating(
 				agg.CTRoundsPlayed, agg.CTKills, agg.CTDeaths, agg.CTDamage, agg.CTEcoKillValue,
-				agg.CTRoundSwing, agg.CTKAST, agg.ctMultiKills, agg.CTClutchRounds, agg.CTClutchWins)
+				agg.CTProbabilitySwing, agg.CTKAST, agg.ctMultiKills, agg.CTClutchRounds, agg.CTClutchWins)
 		}
 		if agg.GamesCount > 0 {
 			agg.FinalRating = agg.ratingSum / float64(agg.GamesCount)
