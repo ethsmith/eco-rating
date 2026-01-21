@@ -92,9 +92,6 @@ const (
 	SwingContribPositive = 1.40 // Multiplier for positive swing
 	SwingContribNegative = 1.40 // Multiplier for negative swing
 
-	// Probability-based swing contribution (HLTV 3.0 style)
-	// ProbabilitySwingPerRound typically ranges from -0.15 to +0.15
-	// A player with +0.10 avg swing gets +0.25 rating boost
 	ProbSwingContribMultiplier = 2.5
 
 	// Impact contribution weights

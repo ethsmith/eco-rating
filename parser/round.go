@@ -71,3 +71,23 @@ func (m *MatchState) ensureRound(p *common.Player) *model.RoundStats {
 	}
 	return m.Round[id]
 }
+
+// ShouldSkipEvent returns true if the current event should be skipped
+// (knife round or match not started).
+func (m *MatchState) ShouldSkipEvent() bool {
+	return m.IsKnifeRound || !m.MatchStarted
+}
+
+// CountAlivePlayers counts alive players on each team from the given participants.
+func (m *MatchState) CountAlivePlayers(participants []*common.Player) (tAlive, ctAlive int) {
+	for _, p := range participants {
+		if p.IsAlive() {
+			if p.Team == common.TeamTerrorists {
+				tAlive++
+			} else if p.Team == common.TeamCounterTerrorists {
+				ctAlive++
+			}
+		}
+	}
+	return tAlive, ctAlive
+}
