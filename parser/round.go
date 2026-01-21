@@ -10,6 +10,7 @@ package parser
 
 import (
 	"eco-rating/model"
+	"eco-rating/rating/probability"
 	"fmt"
 
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
@@ -21,6 +22,7 @@ type MatchState struct {
 	Players        map[uint64]*model.PlayerStats
 	Round          map[uint64]*model.RoundStats
 	TradeDetector  *TradeDetector
+	SwingTracker   *SwingTracker
 	RoundHasKill   bool
 	MatchStarted   bool
 	IsKnifeRound   bool
@@ -33,6 +35,10 @@ type MatchState struct {
 	EnemyScore     int
 	RoundDecided   bool
 	RoundDecidedAt float64
+	BombPlanted    bool
+
+	// Round start state for swing calculation
+	RoundStartState *probability.RoundState
 }
 
 // NewMatchState creates a new MatchState with initialized maps.
@@ -41,6 +47,7 @@ func NewMatchState() *MatchState {
 		Players:       make(map[uint64]*model.PlayerStats),
 		Round:         make(map[uint64]*model.RoundStats),
 		TradeDetector: NewTradeDetector(),
+		SwingTracker:  NewSwingTracker(),
 	}
 }
 

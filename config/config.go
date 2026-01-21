@@ -16,13 +16,13 @@ import (
 // Config holds all application configuration settings.
 // These can be set via JSON config file or command-line flags.
 type Config struct {
-	Cumulative    bool   `json:"cumulative"`     // Enable batch processing mode
-	Tier          string `json:"tier"`           // Competitive tier filter (comma-separated for multiple)
-	BaseURL       string `json:"base_url"`       // Cloud bucket base URL
-	Prefix        string `json:"prefix"`         // Bucket prefix for demo files
-	DemoPath      string `json:"demo_path"`      // Path to single demo file (single mode)
-	DemoDir       string `json:"demo_dir"`       // Local directory for downloaded demos
-	EnableLogging bool   `json:"enable_logging"` // Enable detailed parsing logs
+	Cumulative    bool     `json:"cumulative"`     // Enable batch processing mode
+	Tier          string   `json:"tier"`           // Competitive tier filter (comma-separated for multiple)
+	BaseURL       string   `json:"base_url"`       // Cloud bucket base URL
+	Prefixes      []string `json:"prefixes"`       // Bucket prefixes for demo files (multiple paths)
+	DemoPath      string   `json:"demo_path"`      // Path to single demo file (single mode)
+	DemoDir       string   `json:"demo_dir"`       // Local directory for downloaded demos
+	EnableLogging bool     `json:"enable_logging"` // Enable detailed parsing logs
 }
 
 // DefaultConfig returns a Config with sensible default values.
@@ -32,7 +32,7 @@ func DefaultConfig() *Config {
 		Cumulative:    false,
 		Tier:          "",
 		BaseURL:       "https://cscdemos.nyc3.digitaloceanspaces.com/",
-		Prefix:        "s19/Combines/",
+		Prefixes:      []string{"s19/Combines/"},
 		DemoPath:      "",
 		DemoDir:       "./demos",
 		EnableLogging: true,

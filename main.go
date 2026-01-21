@@ -33,6 +33,7 @@ import (
 	"eco-rating/model"
 	"eco-rating/output"
 	"eco-rating/parser"
+	"eco-rating/rating/probability"
 )
 
 // main initializes the application, parses command-line flags, loads configuration,
@@ -111,12 +112,13 @@ func main() {
 // ParseResult holds the outcome of parsing a single demo file.
 // It contains player statistics, map information, and any errors encountered.
 type ParseResult struct {
-	DemoKey string                        // Unique identifier for the demo file
-	Players map[uint64]*model.PlayerStats // Map of Steam ID to player statistics
-	MapName string                        // Name of the map played (e.g., de_dust2)
-	Tier    string                        // Competitive tier (e.g., contender, elite)
-	Logs    string                        // Debug/parsing logs if enabled
-	Error   error                         // Any error encountered during parsing
+	DemoKey   string                        // Unique identifier for the demo file
+	Players   map[uint64]*model.PlayerStats // Map of Steam ID to player statistics
+	MapName   string                        // Name of the map played (e.g., de_dust2)
+	Tier      string                        // Competitive tier (e.g., contender, elite)
+	Logs      string                        // Debug/parsing logs if enabled
+	Collector *probability.DataCollector    // Probability data collected from this demo
+	Error     error                         // Any error encountered during parsing
 }
 
 // downloadedDemo represents a demo file that has been downloaded and extracted.
@@ -134,48 +136,53 @@ func runCumulativeMode(cfg *config.Config, tiers []string, exporter export.Expor
 	client := bucket.NewClient(cfg.BaseURL)
 	dl := downloader.NewDownloader(cfg.DemoDir)
 	aggregator := output.NewAggregator()
+	probCollector := probability.NewDataCollector()
 
-	for _, tier := range tiers {
-		log.Printf("\n=== Processing tier: %s ===", tier)
+	for _, prefix := range cfg.Prefixes {
+		log.Printf("\n=== Processing prefix: %s ===", prefix)
 
-		log.Printf("Fetching demo list from %s%s...", cfg.BaseURL, cfg.Prefix)
-		demos, err := client.GetAllDemosByTier(cfg.Prefix, tier)
-		if err != nil {
-			log.Printf("Failed to get demos for tier %s: %v", tier, err)
-			continue
-		}
+		for _, tier := range tiers {
+			log.Printf("\n=== Processing tier: %s ===", tier)
 
-		log.Printf("Found %d demos for tier '%s'", len(demos), tier)
-
-		var downloadedDemos []downloadedDemo
-
-		log.Printf("Downloading demos...")
-		for i, demo := range demos {
-			log.Printf("[%d/%d] Downloading: %s", i+1, len(demos), demo.Key)
-
-			url := client.GetDownloadURL(demo.Key)
-			demoPath, err := dl.DownloadAndExtract(url)
+			log.Printf("Fetching demo list from %s%s...", cfg.BaseURL, prefix)
+			demos, err := client.GetAllDemosByTier(prefix, tier)
 			if err != nil {
-				log.Printf("  Error downloading: %v", err)
+				log.Printf("Failed to get demos for tier %s: %v", tier, err)
 				continue
 			}
 
-			downloadedDemos = append(downloadedDemos, downloadedDemo{Key: demo.Key, Path: demoPath})
-		}
+			log.Printf("Found %d demos for tier '%s'", len(demos), tier)
 
-		log.Printf("Downloaded %d demos for tier %s, starting parallel parsing...", len(downloadedDemos), tier)
+			var downloadedDemos []downloadedDemo
 
-		successCount, allLogs := parseDemosToAggregator(cfg, downloadedDemos, aggregator, tier)
+			log.Printf("Downloading demos...")
+			for i, demo := range demos {
+				log.Printf("[%d/%d] Downloading: %s", i+1, len(demos), demo.Key)
 
-		if len(allLogs) > 0 {
-			log.Printf("\n========== PARSING LOGS (%s) ==========", tier)
-			for _, logOutput := range allLogs {
-				fmt.Println(logOutput)
+				url := client.GetDownloadURL(demo.Key)
+				demoPath, err := dl.DownloadAndExtract(url)
+				if err != nil {
+					log.Printf("  Error downloading: %v", err)
+					continue
+				}
+
+				downloadedDemos = append(downloadedDemos, downloadedDemo{Key: demo.Key, Path: demoPath})
 			}
-			log.Printf("========== END LOGS ==========\n")
-		}
 
-		log.Printf("Completed processing %d/%d demos for tier %s", successCount, len(downloadedDemos), tier)
+			log.Printf("Downloaded %d demos for tier %s, starting parallel parsing...", len(downloadedDemos), tier)
+
+			successCount, allLogs := parseDemosToAggregator(cfg, downloadedDemos, aggregator, probCollector, tier)
+
+			if len(allLogs) > 0 {
+				log.Printf("\n========== PARSING LOGS (%s) ==========", tier)
+				for _, logOutput := range allLogs {
+					fmt.Println(logOutput)
+				}
+				log.Printf("========== END LOGS ==========\n")
+			}
+
+			log.Printf("Completed processing %d/%d demos for tier %s", successCount, len(downloadedDemos), tier)
+		}
 	}
 
 	aggregator.Finalize()
@@ -186,13 +193,24 @@ func runCumulativeMode(cfg *config.Config, tiers []string, exporter export.Expor
 		log.Fatalf("Failed to export aggregated stats: %v", err)
 	}
 
+	// Save probability data
+	rounds, kills := probCollector.GetStats()
+	if rounds > 0 {
+		probDataPath := "probability_data.json"
+		if err := probCollector.SaveToFile(probDataPath); err != nil {
+			log.Printf("Warning: Failed to save probability data: %v", err)
+		} else {
+			log.Printf("Probability data saved to %s (%d rounds, %d kills)", probDataPath, rounds, kills)
+		}
+	}
+
 	log.Printf("\nAggregated stats for %d players across %d tiers exported successfully", len(results), len(tiers))
 }
 
 // parseDemosToAggregator processes multiple demos in parallel using a worker pool.
 // It returns the count of successfully parsed demos and collected log output.
 // The number of workers is capped at 8 or the number of CPU cores, whichever is lower.
-func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo, aggregator *output.Aggregator, tier string) (int, []string) {
+func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo, aggregator *output.Aggregator, probCollector *probability.DataCollector, tier string) (int, []string) {
 	numWorkers := runtime.NumCPU()
 	if numWorkers > 8 {
 		numWorkers = 8
@@ -208,14 +226,15 @@ func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				players, mapName, logs, err := parseDemoWithLogs(job.Path, cfg.EnableLogging)
+				players, mapName, logs, collector, err := parseDemoWithLogs(job.Path, cfg.EnableLogging)
 				results <- ParseResult{
-					DemoKey: job.Key,
-					Players: players,
-					MapName: mapName,
-					Tier:    tier,
-					Logs:    logs,
-					Error:   err,
+					DemoKey:   job.Key,
+					Players:   players,
+					MapName:   mapName,
+					Tier:      tier,
+					Logs:      logs,
+					Collector: collector,
+					Error:     err,
 				}
 			}
 		}()
@@ -243,6 +262,12 @@ func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo
 		}
 
 		aggregator.AddGame(result.Players, result.MapName, result.Tier)
+
+		// Merge probability data from this demo
+		if result.Collector != nil {
+			probCollector.Merge(result.Collector)
+		}
+
 		successCount++
 		log.Printf("[%d/%d] Parsed: %s (map: %s, players: %d)", processedCount, len(downloadedDemos), result.DemoKey, result.MapName, len(result.Players))
 
@@ -276,18 +301,18 @@ func parseSingleDemo(demoPath string, enableLogging bool, exporter export.Export
 }
 
 // parseDemoWithLogs opens and parses a demo file, returning player stats, map name,
-// log output, and any error. This is the core parsing function used by both modes.
-func parseDemoWithLogs(demoPath string, enableLogging bool) (map[uint64]*model.PlayerStats, string, string, error) {
+// log output, probability collector, and any error. This is the core parsing function used by both modes.
+func parseDemoWithLogs(demoPath string, enableLogging bool) (map[uint64]*model.PlayerStats, string, string, *probability.DataCollector, error) {
 	demo, err := os.Open(demoPath)
 	if err != nil {
-		return nil, "", "", fmt.Errorf("failed to open demo: %w", err)
+		return nil, "", "", nil, fmt.Errorf("failed to open demo: %w", err)
 	}
 	defer demo.Close()
 
 	p := parser.NewDemoParserWithLogging(demo, enableLogging)
 	if err := p.Parse(); err != nil {
-		return nil, "", "", fmt.Errorf("failed to parse demo: %w", err)
+		return nil, "", "", nil, fmt.Errorf("failed to parse demo: %w", err)
 	}
 
-	return p.GetPlayers(), p.GetMapName(), p.GetLogs(), nil
+	return p.GetPlayers(), p.GetMapName(), p.GetLogs(), p.GetCollector(), nil
 }

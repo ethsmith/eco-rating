@@ -11,6 +11,7 @@ package parser
 import (
 	"eco-rating/model"
 	"eco-rating/rating"
+	"eco-rating/rating/probability"
 	"math"
 
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
@@ -70,6 +71,8 @@ func (d *DemoParser) handleRoundStart() {
 	d.state.TradeDetector.Reset()
 	d.state.RoundDecided = false
 	d.state.RoundDecidedAt = 0
+	d.state.BombPlanted = false
+	d.state.RoundStartState = nil
 }
 
 // registerBombHandlers sets up bomb plant, defuse, and explode handlers.
@@ -93,9 +96,36 @@ func (d *DemoParser) handleBombPlanted(e events.BombPlanted) {
 		return
 	}
 
+	// Record state snapshot BEFORE bomb plant
+	if d.collector != nil {
+		gs := d.parser.GameState()
+		tAlive := 0
+		ctAlive := 0
+		for _, p := range gs.Participants().Playing() {
+			if p.IsAlive() {
+				if p.Team == common.TeamTerrorists {
+					tAlive++
+				} else if p.Team == common.TeamCounterTerrorists {
+					ctAlive++
+				}
+			}
+		}
+		d.collector.RecordStateSnapshot(tAlive, ctAlive, false) // bomb not planted yet
+	}
+
+	d.state.BombPlanted = true
+
 	planter := d.state.ensurePlayer(e.Player)
 	roundStats := d.state.ensureRound(e.Player)
 	roundStats.PlantedBomb = true
+
+	// Track bomb plant swing
+	if d.state.SwingTracker != nil {
+		currentTime := float64(d.parser.CurrentFrame()) / float64(rating.TickRate)
+		timeInRound := currentTime - d.state.RoundStartTime
+		plantSwing := d.state.SwingTracker.RecordBombPlant(e.Player.SteamID64, timeInRound)
+		roundStats.ProbabilitySwing += plantSwing
+	}
 
 	d.logger.LogBombPlant(d.state.RoundNumber, planter.Name)
 }
@@ -106,9 +136,34 @@ func (d *DemoParser) handleBombDefused(e events.BombDefused) {
 		return
 	}
 
+	// Record state snapshot before defuse
+	if d.collector != nil {
+		gs := d.parser.GameState()
+		tAlive := 0
+		ctAlive := 0
+		for _, p := range gs.Participants().Playing() {
+			if p.IsAlive() {
+				if p.Team == common.TeamTerrorists {
+					tAlive++
+				} else if p.Team == common.TeamCounterTerrorists {
+					ctAlive++
+				}
+			}
+		}
+		d.collector.RecordStateSnapshot(tAlive, ctAlive, true) // bomb is planted
+	}
+
 	defuser := d.state.ensurePlayer(e.Player)
 	roundStats := d.state.ensureRound(e.Player)
 	roundStats.DefusedBomb = true
+
+	// Track bomb defuse swing
+	if d.state.SwingTracker != nil {
+		currentTime := float64(d.parser.CurrentFrame()) / float64(rating.TickRate)
+		timeInRound := currentTime - d.state.RoundStartTime
+		defuseSwing := d.state.SwingTracker.RecordBombDefuse(e.Player.SteamID64, timeInRound)
+		roundStats.ProbabilitySwing += defuseSwing
+	}
 
 	d.logger.LogBombDefuse(d.state.RoundNumber, defuser.Name)
 }
@@ -122,6 +177,11 @@ func (d *DemoParser) handleBombExplode() {
 	timeInRound := currentTime - d.state.RoundStartTime
 	d.state.RoundDecided = true
 	d.state.RoundDecidedAt = timeInRound
+
+	// Track bomb explode event
+	if d.state.SwingTracker != nil {
+		d.state.SwingTracker.RecordBombExplode(timeInRound)
+	}
 }
 
 // registerFlashHandlers sets up flash and grenade throw handlers.
@@ -147,6 +207,11 @@ func (d *DemoParser) handlePlayerFlashed(e events.PlayerFlashed) {
 		if e.Attacker.Team != e.Player.Team {
 			roundStats.FlashAssists++
 			roundStats.EnemyFlashDuration += flashDuration
+
+			// Track flash for swing attribution
+			if d.state.SwingTracker != nil {
+				d.state.SwingTracker.RecordFlash(e.Attacker.SteamID64, e.Player.SteamID64, flashDuration)
+			}
 		} else if e.Attacker.SteamID64 != e.Player.SteamID64 {
 			roundStats.TeamFlashCount++
 			roundStats.TeamFlashDuration += flashDuration
@@ -203,15 +268,48 @@ func (d *DemoParser) handleFreezetimeEnd() {
 
 	d.logger.LogRoundStart(d.state.RoundNumber)
 
+	// Count players and calculate team economies for swing tracking
+	tAlive := 0
+	ctAlive := 0
+	tEquipTotal := 0
+	ctEquipTotal := 0
+
 	for _, p := range participants {
 		d.state.ensurePlayer(p)
 		roundStats := d.state.ensureRound(p)
 		roundStats.IsPistolRound = d.state.IsPistolRound
+		roundStats.EquipmentValue = float64(p.EquipmentValueCurrent())
+
 		if p.Team == common.TeamTerrorists {
 			roundStats.PlayerSide = "T"
+			tAlive++
+			tEquipTotal += p.EquipmentValueCurrent()
 		} else if p.Team == common.TeamCounterTerrorists {
 			roundStats.PlayerSide = "CT"
+			ctAlive++
+			ctEquipTotal += p.EquipmentValueCurrent()
 		}
+	}
+
+	// Initialize swing tracker for the round
+	if d.state.SwingTracker != nil && d.state.SwingTracker.IsEnabled() {
+		d.state.SwingTracker.ResetRound(tAlive, ctAlive, d.state.MapName)
+
+		// Set team economies
+		tAvgEquip := 0.0
+		ctAvgEquip := 0.0
+		if tAlive > 0 {
+			tAvgEquip = float64(tEquipTotal) / float64(tAlive)
+		}
+		if ctAlive > 0 {
+			ctAvgEquip = float64(ctEquipTotal) / float64(ctAlive)
+		}
+		d.state.SwingTracker.SetEconomyFromValues(tAvgEquip, ctAvgEquip)
+
+		// Store initial state for end-of-round calculation
+		d.state.RoundStartState = probability.NewRoundState(tAlive, ctAlive, d.state.MapName)
+		d.state.RoundStartState.TEconomy = probability.CategorizeEquipment(tAvgEquip)
+		d.state.RoundStartState.CTEconomy = probability.CategorizeEquipment(ctAvgEquip)
 	}
 }
 
@@ -296,6 +394,25 @@ func (d *DemoParser) handleKill(e events.Kill) {
 	attackerEquip := a.EquipmentValueCurrent()
 	victimEquip := v.EquipmentValueCurrent()
 
+	// Record kill for probability data collection
+	if d.collector != nil {
+		// Record state snapshot BEFORE this kill (victim still counted as alive)
+		gs := d.parser.GameState()
+		tAlive := 0
+		ctAlive := 0
+		for _, p := range gs.Participants().Playing() {
+			if p.IsAlive() {
+				if p.Team == common.TeamTerrorists {
+					tAlive++
+				} else if p.Team == common.TeamCounterTerrorists {
+					ctAlive++
+				}
+			}
+		}
+		d.collector.RecordStateSnapshot(tAlive, ctAlive, d.state.BombPlanted)
+		d.collector.RecordKill(float64(attackerEquip), float64(victimEquip))
+	}
+
 	killValue := rating.EcoKillValue(float64(attackerEquip), float64(victimEquip))
 	deathPenalty := rating.EcoDeathPenalty(float64(victimEquip), float64(attackerEquip))
 
@@ -376,6 +493,24 @@ func (d *DemoParser) handleKill(e events.Kill) {
 		round.TradeSpeed = tradeSpeed
 	}
 
+	// Track kill swing using probability-based calculator
+	if d.state.SwingTracker != nil {
+		killSwing := d.state.SwingTracker.RecordKill(
+			a.SteamID64, v.SteamID64,
+			a.Team, v.Team,
+			float64(attackerEquip), float64(victimEquip),
+			timeInRound,
+			isTradeKill, e.IsHeadshot,
+		)
+		round.ProbabilitySwing += killSwing
+
+		// Track eco-adjusted kills
+		duelWinRate := d.state.SwingTracker.GetCalculator().GetProbabilityEngine().GetDuelWinRate(float64(attackerEquip), float64(victimEquip))
+		if duelWinRate > 0 {
+			attacker.EcoAdjustedKills += 0.50 / duelWinRate
+		}
+	}
+
 	equipRatio := float64(victimEquip) / math.Max(float64(attackerEquip), 500.0)
 	if equipRatio > 2.0 {
 		round.EcoKill = true
@@ -424,6 +559,11 @@ func (d *DemoParser) handlePlayerHurt(e events.PlayerHurt) {
 			case common.EqHE, common.EqMolotov, common.EqIncendiary:
 				roundStats.UtilityDamage += int(e.HealthDamageTaken)
 			}
+		}
+
+		// Track damage for swing attribution
+		if d.state.SwingTracker != nil {
+			d.state.SwingTracker.RecordDamage(e.Attacker.SteamID64, e.Player.SteamID64, int(e.HealthDamageTaken))
 		}
 	}
 }
@@ -636,6 +776,9 @@ func (d *DemoParser) handleRoundEnd(e events.RoundEnd) {
 		} else if roundStats.PlayerSide == "CT" {
 			player.CTRoundSwing += swing
 		}
+
+		// Add probability-based swing to player stats
+		player.ProbabilitySwing += roundStats.ProbabilitySwing
 	}
 
 	// Use SideStatsUpdater for cleaner stats updates
@@ -669,4 +812,20 @@ func (d *DemoParser) handleRoundEnd(e events.RoundEnd) {
 	}
 
 	d.logger.LogRoundEnd(d.state.RoundNumber)
+
+	// Record round outcome for probability data collection
+	if d.collector != nil {
+		tAlive := 0
+		ctAlive := 0
+		for _, p := range gs.Participants().Playing() {
+			if p.IsAlive() {
+				if p.Team == common.TeamTerrorists {
+					tAlive++
+				} else if p.Team == common.TeamCounterTerrorists {
+					ctAlive++
+				}
+			}
+		}
+		d.collector.RecordRoundEnd(tAlive, ctAlive, d.state.BombPlanted, winnerTeam, d.state.MapName)
+	}
 }

@@ -178,4 +178,10 @@ type PlayerStats struct {
 	UtilityKillsPer100Rounds   float64 `json:"utility_kills_per_100_rounds"`
 	FlashesThrownPerRound      float64 `json:"flashes_thrown_per_round"`
 	FlashAssistsPerRound       float64 `json:"flash_assists_per_round"`
+
+	// Probability-based swing metrics (new for v3.0)
+	ProbabilitySwing         float64 `json:"probability_swing"`           // Cumulative win probability contribution
+	ProbabilitySwingPerRound float64 `json:"probability_swing_per_round"` // Average swing per round
+	EcoAdjustedKills         float64 `json:"eco_adjusted_kills"`          // Kills weighted by duel difficulty
+	SwingRating              float64 `json:"swing_rating"`                // Swing contribution to final rating
 }

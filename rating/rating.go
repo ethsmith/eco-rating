@@ -33,7 +33,6 @@ func ComputeFinalRating(p *model.PlayerStats) float64 {
 	dpr := float64(p.Deaths) / rounds
 	adr := float64(p.Damage) / rounds
 	kast := p.KAST
-	avgSwing := p.RoundSwing / rounds
 
 	openingKillsPerRound := float64(p.OpeningKills) / rounds
 	multiKillRoundsPerRound := float64(p.RoundsWithMultiKill) / rounds
@@ -66,19 +65,17 @@ func ComputeFinalRating(p *model.PlayerStats) float64 {
 		kastContrib = (kast - BaselineKAST) * KASTContribBelow
 	}
 
-	var swingContrib float64
-	if avgSwing >= 0 {
-		swingContrib = avgSwing * SwingContribPositive
-	} else {
-		swingContrib = avgSwing * SwingContribNegative
-	}
+	// Probability-based swing contribution (HLTV 3.0 style)
+	// ProbabilitySwingPerRound is in range [-0.05, +0.05] typically
+	// Scale: +0.04 per round -> +0.40 rating contribution
+	probSwingContrib := p.ProbabilitySwingPerRound * ProbSwingContribMultiplier
 
 	impactContrib := openingKillsPerRound*OpeningKillImpactWeight + multiKillRoundsPerRound*MultiKillImpactWeight
 
 	multiKillBonus := float64(sumMulti(p.MultiKillsRaw)) / rounds
 	multiContrib := multiKillBonus * MultiKillContrib
 
-	rating := RatingBaseline + kprContrib + dprContrib + adrContrib + kastContrib + swingContrib + impactContrib + multiContrib
+	rating := RatingBaseline + kprContrib + dprContrib + adrContrib + kastContrib + probSwingContrib + impactContrib + multiContrib
 
 	return math.Max(MinRating, math.Min(MaxRating, rating))
 }
