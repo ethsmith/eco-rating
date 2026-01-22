@@ -1,3 +1,12 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
+// =============================================================================
+
+// Package probability implements probability-based win calculations.
+// This file defines RoundState which represents the current state of a round
+// (players alive, bomb status, economy) and EconomyCategory for equipment tiers.
 package probability
 
 import (

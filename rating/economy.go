@@ -1,6 +1,7 @@
 // =============================================================================
 // DISCLAIMER: Comments in this file were generated with AI assistance to help
 // users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
 // =============================================================================
 
 // Package rating implements the eco-rating calculation system.
@@ -65,22 +66,4 @@ func EcoDeathPenalty(victimEquip, killerEquip float64) float64 {
 	} else {
 		return EcoDeathPistolVsRifle
 	}
-}
-
-// EconWeight is an alias for EcoKillValue for backward compatibility.
-func EconWeight(attackerValue, victimValue float64) float64 {
-	return EcoKillValue(attackerValue, victimValue)
-}
-
-// RoundImportance returns a multiplier based on team equipment value.
-// Low equipment rounds (eco/force) have lower importance (0.7x),
-// while full buy rounds have higher importance (1.2x).
-func RoundImportance(teamValue float64) float64 {
-	if teamValue < 10000 {
-		return 0.7
-	}
-	if teamValue < 20000 {
-		return 1.0
-	}
-	return 1.2
 }

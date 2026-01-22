@@ -1,6 +1,7 @@
 // =============================================================================
 // DISCLAIMER: Comments in this file were generated with AI assistance to help
 // users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
 // =============================================================================
 
 // Package rating implements the eco-rating calculation system.
@@ -53,17 +54,6 @@ func ComputeFinalRating(p *model.PlayerStats) float64 {
 	rating := RatingBaseline + adrContrib + kastContrib + probSwingContrib
 
 	return math.Max(MinRating, math.Min(MaxRating, rating))
-}
-
-// sumMulti calculates a weighted sum of multi-kill rounds.
-// Higher kill counts receive exponentially higher weights.
-func sumMulti(m [6]int) int {
-	weights := [6]int{0, 0, 2, 6, 14, 30}
-	total := 0
-	for i := 2; i <= 5; i++ {
-		total += m[i] * weights[i]
-	}
-	return total
 }
 
 // ComputeSideRating calculates a rating for a specific side (T or CT).

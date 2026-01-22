@@ -1,3 +1,13 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
+// =============================================================================
+
+// Package probability implements probability-based win calculations.
+// This file contains the Engine which calculates win probabilities based on
+// game state (players alive, bomb status, economy, map). These probabilities
+// are used to compute the "swing" impact of each player action.
 package probability
 
 import "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"

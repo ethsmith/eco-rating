@@ -1,3 +1,12 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
+// =============================================================================
+
+// Package probability implements probability-based win calculations.
+// This file contains the DataCollector which aggregates game state outcomes
+// from demo parsing to build empirical probability tables for swing calculation.
 package probability
 
 import (

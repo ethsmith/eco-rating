@@ -1,3 +1,12 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
+// =============================================================================
+
+// Package swing implements probability-based player impact calculation.
+// This file contains the Attributor which distributes swing credit among
+// players who contributed to a kill (killer, damage dealers, flash assists).
 package swing
 
 import "math"
@@ -24,19 +33,7 @@ const (
 
 	// SavePenalty is the small negative swing for surviving a lost round.
 	SavePenalty = 0.02
-
-	// ClutchBonusMultiplier scales additional clutch bonuses.
-	ClutchBonusMultiplier = 1.0
 )
-
-// Clutch bonus values for winning clutches (added on top of probability swing).
-var ClutchBonuses = map[int]float64{
-	1: 0.02, // 1v1 clutch
-	2: 0.04, // 1v2 clutch
-	3: 0.08, // 1v3 clutch
-	4: 0.15, // 1v4 clutch
-	5: 0.25, // 1v5 clutch
-}
 
 // Attributor handles the distribution of kill credit among contributors.
 type Attributor struct{}
@@ -118,50 +115,5 @@ func (a *Attributor) attributeFlashAssists(
 		flashCredit := math.Min(flash.Duration/3.0, 1.0) * FlashAssistMaxCredit
 
 		playerSwing[flash.PlayerID] += delta * flashCredit
-	}
-}
-
-// AddClutchBonus adds additional bonus for winning a clutch.
-func (a *Attributor) AddClutchBonus(
-	playerSwing map[uint64]float64,
-	clutcherID uint64,
-	clutchSize int,
-	won bool,
-) {
-	if !won || clutchSize < 1 {
-		return
-	}
-
-	bonus, ok := ClutchBonuses[clutchSize]
-	if !ok {
-		// For clutches larger than 5 (shouldn't happen), use 1v5 bonus
-		bonus = ClutchBonuses[5]
-	}
-
-	playerSwing[clutcherID] += bonus * ClutchBonusMultiplier
-}
-
-// DistributeRemainingSwing distributes any remaining probability to contributors.
-// Used when players save and the round ends without reaching 0% or 100%.
-func (a *Attributor) DistributeRemainingSwing(
-	playerSwing map[uint64]float64,
-	contributors map[uint64]float64, // PlayerID -> contribution weight
-	remainingProb float64,
-	shareMultiplier float64,
-) {
-	// Normalize contribution weights
-	totalWeight := 0.0
-	for _, weight := range contributors {
-		totalWeight += weight
-	}
-
-	if totalWeight <= 0 {
-		return
-	}
-
-	// Distribute proportionally
-	for playerID, weight := range contributors {
-		share := (weight / totalWeight) * remainingProb * shareMultiplier
-		playerSwing[playerID] += share
 	}
 }

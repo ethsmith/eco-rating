@@ -1,6 +1,7 @@
 // =============================================================================
 // DISCLAIMER: Comments in this file were generated with AI assistance to help
 // users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
 // =============================================================================
 
 // Package parser provides CS2 demo file parsing functionality.
@@ -63,16 +64,6 @@ func (d *DemoParser) SetLogging(enabled bool) {
 // SetPlayerFilter limits logging to events involving the specified players.
 func (d *DemoParser) SetPlayerFilter(players []string) {
 	d.logger.SetPlayerFilter(players)
-}
-
-// AddPlayerFilter adds a player to the logging filter.
-func (d *DemoParser) AddPlayerFilter(player string) {
-	d.logger.AddPlayerFilter(player)
-}
-
-// ClearPlayerFilter removes all player filters, logging all events.
-func (d *DemoParser) ClearPlayerFilter() {
-	d.logger.ClearPlayerFilter()
 }
 
 // Parse processes the entire demo file and computes all player statistics.

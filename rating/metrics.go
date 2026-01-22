@@ -1,6 +1,7 @@
 // =============================================================================
 // DISCLAIMER: Comments in this file were generated with AI assistance to help
 // users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
 // =============================================================================
 
 // Package rating implements the eco-rating calculation system.
@@ -183,115 +184,4 @@ func CalculateDerivedMetrics(input DerivedMetricsInput) DerivedMetricsOutput {
 	output.KAST = input.KASTCount / rounds
 
 	return output
-}
-
-// DerivedMetricsCalculator provides a fluent interface for computing derived metrics.
-type DerivedMetricsCalculator struct {
-	input DerivedMetricsInput
-}
-
-// NewDerivedMetricsCalculator creates a new calculator.
-func NewDerivedMetricsCalculator() *DerivedMetricsCalculator {
-	return &DerivedMetricsCalculator{}
-}
-
-// WithBasicStats sets the basic statistics.
-func (c *DerivedMetricsCalculator) WithBasicStats(roundsPlayed, roundsWon, roundsLost, kills, deaths, damage, assists int) *DerivedMetricsCalculator {
-	c.input.RoundsPlayed = roundsPlayed
-	c.input.RoundsWon = roundsWon
-	c.input.RoundsLost = roundsLost
-	c.input.Kills = kills
-	c.input.Deaths = deaths
-	c.input.Damage = damage
-	c.input.Assists = assists
-	return c
-}
-
-// WithTimeStats sets time-related statistics.
-func (c *DerivedMetricsCalculator) WithTimeStats(totalTimeAlive, enemyFlashDur, teamFlashDur float64) *DerivedMetricsCalculator {
-	c.input.TotalTimeAlive = totalTimeAlive
-	c.input.EnemyFlashDuration = enemyFlashDur
-	c.input.TeamFlashDuration = teamFlashDur
-	return c
-}
-
-// WithSurvivalStats sets survival and KAST counts.
-func (c *DerivedMetricsCalculator) WithSurvivalStats(survivalCount, kastCount float64) *DerivedMetricsCalculator {
-	c.input.SurvivalCount = survivalCount
-	c.input.KASTCount = kastCount
-	return c
-}
-
-// WithOpeningStats sets opening kill/death statistics.
-func (c *DerivedMetricsCalculator) WithOpeningStats(kills, deaths, attempts, successes, roundsWonAfter int) *DerivedMetricsCalculator {
-	c.input.OpeningKills = kills
-	c.input.OpeningDeaths = deaths
-	c.input.OpeningAttempts = attempts
-	c.input.OpeningSuccesses = successes
-	c.input.RoundsWonAfterOpen = roundsWonAfter
-	return c
-}
-
-// WithClutchStats sets clutch statistics.
-func (c *DerivedMetricsCalculator) WithClutchStats(wins, lastAlive, attempts1v1, wins1v1 int) *DerivedMetricsCalculator {
-	c.input.ClutchWins = wins
-	c.input.LastAliveRounds = lastAlive
-	c.input.Clutch1v1Attempts = attempts1v1
-	c.input.Clutch1v1Wins = wins1v1
-	return c
-}
-
-// WithAWPStats sets AWP-related statistics.
-func (c *DerivedMetricsCalculator) WithAWPStats(kills, roundsWithKill, multiKillRounds, openingKills int) *DerivedMetricsCalculator {
-	c.input.AWPKills = kills
-	c.input.RoundsWithAWPKill = roundsWithKill
-	c.input.AWPMultiKillRounds = multiKillRounds
-	c.input.AWPOpeningKills = openingKills
-	return c
-}
-
-// WithUtilityStats sets utility-related statistics.
-func (c *DerivedMetricsCalculator) WithUtilityStats(damage, kills, flashesThrown, flashAssists int) *DerivedMetricsCalculator {
-	c.input.UtilityDamage = damage
-	c.input.UtilityKills = kills
-	c.input.FlashesThrown = flashesThrown
-	c.input.FlashAssists = flashAssists
-	return c
-}
-
-// WithTradeStats sets trade-related statistics.
-func (c *DerivedMetricsCalculator) WithTradeStats(tradeKills, tradedDeaths, savedByTeammate, savedTeammate int) *DerivedMetricsCalculator {
-	c.input.TradeKills = tradeKills
-	c.input.TradedDeaths = tradedDeaths
-	c.input.SavedByTeammate = savedByTeammate
-	c.input.SavedTeammate = savedTeammate
-	return c
-}
-
-// WithRoundStats sets round-based statistics.
-func (c *DerivedMetricsCalculator) WithRoundStats(roundsWithKill, roundsWithMultiKill, supportRounds, attackRounds int) *DerivedMetricsCalculator {
-	c.input.RoundsWithKill = roundsWithKill
-	c.input.RoundsWithMultiKill = roundsWithMultiKill
-	c.input.SupportRounds = supportRounds
-	c.input.AttackRounds = attackRounds
-	return c
-}
-
-// WithEconomyStats sets economy-related statistics.
-func (c *DerivedMetricsCalculator) WithEconomyStats(lowBuyKills, disadvantagedKills int) *DerivedMetricsCalculator {
-	c.input.LowBuyKills = lowBuyKills
-	c.input.DisadvantagedKills = disadvantagedKills
-	return c
-}
-
-// WithMiscStats sets miscellaneous statistics.
-func (c *DerivedMetricsCalculator) WithMiscStats(assistedKills, savesOnLoss int) *DerivedMetricsCalculator {
-	c.input.AssistedKills = assistedKills
-	c.input.SavesOnLoss = savesOnLoss
-	return c
-}
-
-// Calculate computes and returns the derived metrics.
-func (c *DerivedMetricsCalculator) Calculate() DerivedMetricsOutput {
-	return CalculateDerivedMetrics(c.input)
 }

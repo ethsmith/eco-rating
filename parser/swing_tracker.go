@@ -1,3 +1,13 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
+// =============================================================================
+
+// Package parser provides CS2 demo file parsing functionality.
+// This file implements the SwingTracker which manages round state and
+// probability-based swing calculation during demo parsing. It coordinates
+// between the probability engine, damage tracker, and round events.
 package parser
 
 import (

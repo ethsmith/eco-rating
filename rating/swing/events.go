@@ -1,3 +1,12 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
+// =============================================================================
+
+// Package swing implements probability-based player impact calculation.
+// This file defines the event types that can affect round swing:
+// kills, bomb plants, bomb defuses, and bomb explosions.
 package swing
 
 import "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"

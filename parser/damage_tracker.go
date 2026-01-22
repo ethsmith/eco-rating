@@ -1,3 +1,12 @@
+// =============================================================================
+// DISCLAIMER: Comments in this file were generated with AI assistance to help
+// users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
+// =============================================================================
+
+// Package parser provides CS2 demo file parsing functionality.
+// This file implements damage tracking to attribute kill credit to players
+// who dealt damage to a victim before they were killed.
 package parser
 
 import (

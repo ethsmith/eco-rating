@@ -1,6 +1,7 @@
 // =============================================================================
 // DISCLAIMER: Comments in this file were generated with AI assistance to help
 // users find and understand code for reference while building FraGG 3.0.
+// There may be mistakes in the comments. Please verify accuracy.
 // =============================================================================
 
 // Package parser provides CS2 demo file parsing functionality.
@@ -39,11 +40,6 @@ func (l *Logger) GetOutput() string {
 	return l.buffer.String()
 }
 
-// ClearOutput resets the log buffer, discarding all captured output.
-func (l *Logger) ClearOutput() {
-	l.buffer.Reset()
-}
-
 // SetPlayerFilter sets the list of player names to include in logging.
 // Only events involving these players will be logged.
 func (l *Logger) SetPlayerFilter(players []string) {
@@ -51,16 +47,6 @@ func (l *Logger) SetPlayerFilter(players []string) {
 	for _, p := range players {
 		l.playerFilter[p] = true
 	}
-}
-
-// AddPlayerFilter adds a single player to the filter list.
-func (l *Logger) AddPlayerFilter(player string) {
-	l.playerFilter[player] = true
-}
-
-// ClearPlayerFilter removes all player filters, allowing all events to be logged.
-func (l *Logger) ClearPlayerFilter() {
-	l.playerFilter = make(map[string]bool)
 }
 
 // shouldLog returns true if logging is enabled and any of the given players
@@ -218,14 +204,6 @@ func (l *Logger) LogKnifeRound() {
 	l.logger.Printf("⚔️  KNIFE ROUND DETECTED - Skipping stats tracking")
 }
 
-// LogWarmup logs detection of warmup period (stats not tracked).
-func (l *Logger) LogWarmup() {
-	if !l.enabled {
-		return
-	}
-	l.logger.Printf("🔥 WARMUP DETECTED - Skipping stats tracking")
-}
-
 // getEcoType returns a descriptive string for the economic advantage of a kill.
 func getEcoType(ratio float64) string {
 	if ratio > 4.0 {
@@ -268,24 +246,7 @@ func getDeathType(ratio float64) string {
 	}
 }
 
-// Disable turns off logging.
-func (l *Logger) Disable() {
-	l.enabled = false
-}
-
-// Enable turns on logging.
-func (l *Logger) Enable() {
-	l.enabled = true
-}
-
 // SetEnabled sets the logging state.
 func (l *Logger) SetEnabled(enabled bool) {
 	l.enabled = enabled
-}
-
-// Printf logs a formatted message if logging is enabled.
-func (l *Logger) Printf(format string, v ...interface{}) {
-	if l.enabled {
-		l.logger.Printf(format, v...)
-	}
 }
