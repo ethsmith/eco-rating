@@ -55,17 +55,6 @@ func ComputeFinalRating(p *model.PlayerStats) float64 {
 	return math.Max(MinRating, math.Min(MaxRating, rating))
 }
 
-// sumMulti calculates a weighted sum of multi-kill rounds.
-// Higher kill counts receive exponentially higher weights.
-func sumMulti(m [6]int) int {
-	weights := [6]int{0, 0, 2, 6, 14, 30}
-	total := 0
-	for i := 2; i <= 5; i++ {
-		total += m[i] * weights[i]
-	}
-	return total
-}
-
 // ComputeSideRating calculates a rating for a specific side (T or CT).
 // Pure probability-based rating matching ComputeFinalRating:
 // - ProbabilitySwing: Core metric measuring win probability impact

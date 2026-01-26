@@ -59,15 +59,6 @@ func LoadConfig(path string) (*Config, error) {
 	return cfg, nil
 }
 
-// SaveConfig writes the configuration to a JSON file with pretty formatting.
-func SaveConfig(cfg *Config, path string) error {
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0644)
-}
-
 // ValidTiers returns the list of valid competitive tier names.
 // Tiers are ordered from highest to lowest skill level.
 func ValidTiers() []string {
@@ -89,12 +80,6 @@ func IsValidTier(tier string) bool {
 		}
 	}
 	return false
-}
-
-// DemoPrefix returns the filename prefix used for demos of a given tier.
-// Demo files are named like "combine-contender-map-timestamp.dem.zip".
-func DemoPrefix(tier string) string {
-	return "combine-" + tier
 }
 
 // ParseTiers splits a comma-separated tier string into individual tier names.

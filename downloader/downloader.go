@@ -147,23 +147,3 @@ func (d *Downloader) DownloadAndExtract(url string) (string, error) {
 
 	return demoPath, nil
 }
-
-// Cleanup removes all .zip files from the output directory.
-// This can be called after processing to free up disk space.
-func (d *Downloader) Cleanup() error {
-	entries, err := os.ReadDir(d.OutputDir)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".zip") {
-			zipPath := filepath.Join(d.OutputDir, entry.Name())
-			if err := os.Remove(zipPath); err != nil {
-				return fmt.Errorf("failed to remove %s: %w", zipPath, err)
-			}
-		}
-	}
-
-	return nil
-}
