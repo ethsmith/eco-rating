@@ -127,8 +127,14 @@ func (c *Calculator) processBombPlant(
 	// Calculate delta
 	delta := probAfter - probBefore
 
-	// Planter gets majority credit for plant
-	playerSwing[plant.PlanterID] += delta * PlantCreditShare
+	// Planter gets majority credit for plant but cap the swing contribution
+	planterSwing := delta * PlantCreditShare
+	if planterSwing > MaxPlantSwing {
+		planterSwing = MaxPlantSwing
+	} else if planterSwing < -MaxPlantSwing {
+		planterSwing = -MaxPlantSwing
+	}
+	playerSwing[plant.PlanterID] += planterSwing
 }
 
 // processBombDefuse handles a bomb defuse event.
