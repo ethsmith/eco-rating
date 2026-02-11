@@ -17,7 +17,7 @@ const (
 	TradeKillPenalty = 0.30
 
 	// PlantCreditShare is the portion of plant swing given to the planter.
-	PlantCreditShare = 0.60
+	PlantCreditShare = 0.40
 
 	// DefuseCreditShare is the portion of defuse swing given to the defuser.
 	DefuseCreditShare = 0.80
@@ -25,18 +25,9 @@ const (
 	// SavePenalty is the small negative swing for surviving a lost round.
 	SavePenalty = 0.02
 
-	// ClutchBonusMultiplier scales additional clutch bonuses.
-	ClutchBonusMultiplier = 1.0
+	// MaxPlantSwing caps how much swing a single bomb plant can award.
+	MaxPlantSwing = 0.10
 )
-
-// Clutch bonus values for winning clutches (added on top of probability swing).
-var ClutchBonuses = map[int]float64{
-	1: 0.02, // 1v1 clutch
-	2: 0.04, // 1v2 clutch
-	3: 0.08, // 1v3 clutch
-	4: 0.15, // 1v4 clutch
-	5: 0.25, // 1v5 clutch
-}
 
 // Attributor handles the distribution of kill credit among contributors.
 type Attributor struct{}
@@ -161,26 +152,6 @@ func allocateShare(desired float64, shareable *float64) float64 {
 	alloc := math.Min(desired, *shareable)
 	*shareable -= alloc
 	return alloc
-}
-
-// AddClutchBonus adds additional bonus for winning a clutch.
-func (a *Attributor) AddClutchBonus(
-	playerSwing map[uint64]float64,
-	clutcherID uint64,
-	clutchSize int,
-	won bool,
-) {
-	if !won || clutchSize < 1 {
-		return
-	}
-
-	bonus, ok := ClutchBonuses[clutchSize]
-	if !ok {
-		// For clutches larger than 5 (shouldn't happen), use 1v5 bonus
-		bonus = ClutchBonuses[5]
-	}
-
-	playerSwing[clutcherID] += bonus * ClutchBonusMultiplier
 }
 
 // DistributeRemainingSwing distributes any remaining probability to contributors.
