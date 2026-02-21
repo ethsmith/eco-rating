@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 
 	"eco-rating/bucket"
@@ -248,11 +249,18 @@ func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo
 			defer wg.Done()
 			for job := range jobs {
 				players, mapName, logs, collector, err := parseDemoWithLogs(job.Path, cfg.EnableLogging)
+				// Determine tier from demo filename: team_ prefix = scrim, otherwise = regulation
+				demoTier := tier
+				if strings.Contains(strings.ToLower(job.Key), "team_") {
+					demoTier = "scrim"
+				} else if tier == "all" {
+					demoTier = "regulation"
+				}
 				results <- ParseResult{
 					DemoKey:   job.Key,
 					Players:   players,
 					MapName:   mapName,
-					Tier:      tier,
+					Tier:      demoTier,
 					Logs:      logs,
 					Collector: collector,
 					Error:     err,

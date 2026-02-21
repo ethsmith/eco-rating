@@ -205,15 +205,20 @@ func NewAggregator() *Aggregator {
 // AddGame incorporates statistics from a single game into the aggregator.
 // It accumulates raw counts and weighted values for later finalization.
 // The mapName is used for per-map rating tracking.
-// When tier is "all", each player's TeamName is used as their tier instead.
+// When tier is "all", players are aggregated by SteamID only (team name stored separately).
 func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName string, tier string) {
 	for _, p := range players {
 		playerTier := tier
-		if tier == "all" && p.TeamName != "" {
-			playerTier = p.TeamName
+		if tier == "all" {
+			playerTier = "all"
 		}
+		// Always use Steam ID in key - the tier value differentiates match types
 		key := p.SteamID + ":" + playerTier
 		agg := a.ensurePlayer(key, p.SteamID, p.Name, playerTier)
+		// Update team name to the most recent non-empty value
+		if p.TeamName != "" {
+			agg.Tier = p.TeamName
+		}
 		agg.GamesCount++
 		agg.RoundsPlayed += p.RoundsPlayed
 		agg.RoundsWon += p.RoundsWon
