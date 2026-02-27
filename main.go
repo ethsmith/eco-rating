@@ -27,14 +27,14 @@ import (
 	"strings"
 	"sync"
 
-	"eco-rating/bucket"
-	"eco-rating/config"
-	"eco-rating/downloader"
-	"eco-rating/export"
-	"eco-rating/model"
-	"eco-rating/output"
-	"eco-rating/parser"
-	"eco-rating/rating/probability"
+	"github.com/ethsmith/eco-rating/bucket"
+	"github.com/ethsmith/eco-rating/config"
+	"github.com/ethsmith/eco-rating/downloader"
+	"github.com/ethsmith/eco-rating/export"
+	"github.com/ethsmith/eco-rating/model"
+	"github.com/ethsmith/eco-rating/output"
+	"github.com/ethsmith/eco-rating/parser"
+	"github.com/ethsmith/eco-rating/rating/probability"
 )
 
 // main initializes the application, parses command-line flags, loads configuration,

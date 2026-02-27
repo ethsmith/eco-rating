@@ -18,8 +18,8 @@ import (
 	"strconv"
 	"strings"
 
-	"eco-rating/model"
-	"eco-rating/output"
+	"github.com/ethsmith/eco-rating/model"
+	"github.com/ethsmith/eco-rating/output"
 )
 
 // FileExportOption implements ExportOption for CSV file output.

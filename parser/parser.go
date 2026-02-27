@@ -14,9 +14,9 @@ import (
 	"io"
 	"log"
 
-	"eco-rating/model"
-	"eco-rating/rating"
-	"eco-rating/rating/probability"
+	"github.com/ethsmith/eco-rating/model"
+	"github.com/ethsmith/eco-rating/rating"
+	"github.com/ethsmith/eco-rating/rating/probability"
 
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs"
 )
