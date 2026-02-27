@@ -9,8 +9,8 @@
 package output
 
 import (
-	"eco-rating/model"
-	"eco-rating/rating"
+	"github.com/ethsmith/eco-rating/model"
+	"github.com/ethsmith/eco-rating/rating"
 )
 
 // MultiKillStats tracks multi-kill round counts for aggregated statistics.
