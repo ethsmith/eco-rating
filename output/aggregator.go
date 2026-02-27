@@ -103,6 +103,10 @@ type AggregatedStats struct {
 	PistolVsRifleKills         int     `json:"pistol_vs_rifle_kills"`
 	TradeKills                 int     `json:"trade_kills"`
 	FastTrades                 int     `json:"fast_trades"`
+	ManAdvantageKills          int     `json:"man_advantage_kills"`
+	ManDisadvantageDeaths      int     `json:"man_disadvantage_deaths"`
+	ManAdvantageKillsPct       float64 `json:"man_advantage_kills_pct"`
+	ManDisadvantageDeathsPct   float64 `json:"man_disadvantage_deaths_pct"`
 	EarlyDeaths                int     `json:"early_deaths"`
 	LowBuyKills                int     `json:"low_buy_kills"`
 	LowBuyKillsPct             float64 `json:"low_buy_kills_pct"`
@@ -127,6 +131,10 @@ type AggregatedStats struct {
 	TKAST                      float64 `json:"t_kast"`
 	TClutchRounds              int     `json:"t_clutch_rounds"`
 	TClutchWins                int     `json:"t_clutch_wins"`
+	TManAdvantageKills         int     `json:"t_man_advantage_kills"`
+	TManAdvantageKillsPct      float64 `json:"t_man_advantage_kills_pct"`
+	TManDisadvantageDeaths     int     `json:"t_man_disadvantage_deaths"`
+	TManDisadvantageDeathsPct  float64 `json:"t_man_disadvantage_deaths_pct"`
 	TRating                    float64 `json:"t_rating"`
 	TEcoRating                 float64 `json:"t_eco_rating"`
 
@@ -141,6 +149,10 @@ type AggregatedStats struct {
 	CTKAST                     float64 `json:"ct_kast"`
 	CTClutchRounds             int     `json:"ct_clutch_rounds"`
 	CTClutchWins               int     `json:"ct_clutch_wins"`
+	CTManAdvantageKills        int     `json:"ct_man_advantage_kills"`
+	CTManAdvantageKillsPct     float64 `json:"ct_man_advantage_kills_pct"`
+	CTManDisadvantageDeaths    int     `json:"ct_man_disadvantage_deaths"`
+	CTManDisadvantageDeathsPct float64 `json:"ct_man_disadvantage_deaths_pct"`
 	CTRating                   float64 `json:"ct_rating"`
 	CTEcoRating                float64 `json:"ct_eco_rating"`
 	tMultiKills                [6]int
@@ -281,6 +293,8 @@ func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName stri
 		agg.PistolVsRifleKills += p.PistolVsRifleKills
 		agg.TradeKills += p.TradeKills
 		agg.FastTrades += p.FastTrades
+		agg.ManAdvantageKills += p.ManAdvantageKills
+		agg.ManDisadvantageDeaths += p.ManDisadvantageDeaths
 		agg.EarlyDeaths += p.EarlyDeaths
 		agg.LowBuyKills += p.LowBuyKills
 		agg.DisadvantagedBuyKills += p.DisadvantagedBuyKills
@@ -302,6 +316,8 @@ func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName stri
 		agg.TKAST += p.TKAST
 		agg.TClutchRounds += p.TClutchRounds
 		agg.TClutchWins += p.TClutchWins
+		agg.TManAdvantageKills += p.TManAdvantageKills
+		agg.TManDisadvantageDeaths += p.TManDisadvantageDeaths
 		for i := 0; i < 6; i++ {
 			agg.tMultiKills[i] += p.TMultiKills[i]
 		}
@@ -317,6 +333,8 @@ func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName stri
 		agg.CTKAST += p.CTKAST
 		agg.CTClutchRounds += p.CTClutchRounds
 		agg.CTClutchWins += p.CTClutchWins
+		agg.CTManAdvantageKills += p.CTManAdvantageKills
+		agg.CTManDisadvantageDeaths += p.CTManDisadvantageDeaths
 		for i := 0; i < 6; i++ {
 			agg.ctMultiKills[i] += p.CTMultiKills[i]
 		}
@@ -408,6 +426,10 @@ func (a *Aggregator) Finalize() {
 			agg.LowBuyKillsPct = float64(agg.LowBuyKills) / float64(agg.Kills)
 			agg.DisadvantagedBuyKillsPct = float64(agg.DisadvantagedBuyKills) / float64(agg.Kills)
 			agg.HeadshotPct = float64(agg.Headshots) / float64(agg.Kills)
+			agg.ManAdvantageKillsPct = float64(agg.ManAdvantageKills) / float64(agg.Kills)
+		}
+		if agg.Deaths > 0 {
+			agg.ManDisadvantageDeathsPct = float64(agg.ManDisadvantageDeaths) / float64(agg.Deaths)
 		}
 		if agg.KillsWithTTK > 0 {
 			agg.AvgTimeToKill = agg.TotalTimeToKill / float64(agg.KillsWithTTK)
@@ -436,6 +458,12 @@ func (a *Aggregator) Finalize() {
 				agg.TRoundsPlayed, agg.TKills, agg.TDeaths, agg.TDamage, agg.TEcoKillValue,
 				agg.TProbabilitySwing, agg.TKAST, agg.tMultiKills, agg.TClutchRounds, agg.TClutchWins)
 		}
+		if agg.TKills > 0 {
+			agg.TManAdvantageKillsPct = float64(agg.TManAdvantageKills) / float64(agg.TKills)
+		}
+		if agg.TDeaths > 0 {
+			agg.TManDisadvantageDeathsPct = float64(agg.TManDisadvantageDeaths) / float64(agg.TDeaths)
+		}
 
 		// CT-side ratings using centralized functions
 		if agg.CTRoundsPlayed > 0 {
@@ -444,6 +472,12 @@ func (a *Aggregator) Finalize() {
 			agg.CTEcoRating = rating.ComputeSideRating(
 				agg.CTRoundsPlayed, agg.CTKills, agg.CTDeaths, agg.CTDamage, agg.CTEcoKillValue,
 				agg.CTProbabilitySwing, agg.CTKAST, agg.ctMultiKills, agg.CTClutchRounds, agg.CTClutchWins)
+		}
+		if agg.CTKills > 0 {
+			agg.CTManAdvantageKillsPct = float64(agg.CTManAdvantageKills) / float64(agg.CTKills)
+		}
+		if agg.CTDeaths > 0 {
+			agg.CTManDisadvantageDeathsPct = float64(agg.CTManDisadvantageDeaths) / float64(agg.CTDeaths)
 		}
 		if agg.GamesCount > 0 {
 			agg.FinalRating = agg.ratingSum / float64(agg.GamesCount)

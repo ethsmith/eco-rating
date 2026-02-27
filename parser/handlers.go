@@ -576,6 +576,46 @@ func (d *DemoParser) processKillerStats(ctx *killContext) {
 		attacker.DisadvantagedBuyKills++
 	}
 
+	// Track man advantage kills and man disadvantage deaths
+	// Get current alive counts (victim is already dead at this point)
+	gs := d.parser.GameState()
+	tAlive, ctAlive := d.state.CountAlivePlayers(gs.Participants().Playing())
+
+	// Reconstruct pre-kill state by adding victim back
+	var attackerAliveAfter, victimAliveAfter int
+	var attackerAliveBefore, victimAliveBefore int
+	if ctx.attacker.Team == common.TeamTerrorists {
+		attackerAliveAfter = tAlive
+		victimAliveAfter = ctAlive
+		attackerAliveBefore = tAlive
+		victimAliveBefore = ctAlive + 1
+	} else {
+		attackerAliveAfter = ctAlive
+		victimAliveAfter = tAlive
+		attackerAliveBefore = ctAlive
+		victimAliveBefore = tAlive + 1
+	}
+
+	// Man advantage kill: attacker's team went from equal/behind to ahead
+	if attackerAliveBefore <= victimAliveBefore && attackerAliveAfter > victimAliveAfter {
+		attacker.ManAdvantageKills++
+		if ctx.attacker.Team == common.TeamTerrorists {
+			attacker.TManAdvantageKills++
+		} else {
+			attacker.CTManAdvantageKills++
+		}
+	}
+
+	// Man disadvantage death: victim's team went from equal/ahead to behind
+	if victimAliveBefore >= attackerAliveBefore && victimAliveAfter < attackerAliveAfter {
+		victim.ManDisadvantageDeaths++
+		if ctx.victim.Team == common.TeamTerrorists {
+			victim.TManDisadvantageDeaths++
+		} else {
+			victim.CTManDisadvantageDeaths++
+		}
+	}
+
 	victim.EcoDeathValue += ctx.deathPenalty
 }
 

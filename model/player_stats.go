@@ -82,6 +82,10 @@ type PlayerStats struct {
 	AssistedKills              int     `json:"assisted_kills"`
 	TradeKills                 int     `json:"trade_kills"`
 	FastTrades                 int     `json:"fast_trades"`
+	ManAdvantageKills          int     `json:"man_advantage_kills"`
+	ManAdvantageKillsPct       float64 `json:"man_advantage_kills_pct"`
+	ManDisadvantageDeaths      int     `json:"man_disadvantage_deaths"`
+	ManDisadvantageDeathsPct   float64 `json:"man_disadvantage_deaths_pct"`
 	OpeningAttempts            int     `json:"opening_attempts"`
 	OpeningSuccesses           int     `json:"opening_successes"`
 	RoundsWonAfterOpening      int     `json:"rounds_won_after_opening"`
@@ -132,6 +136,10 @@ type PlayerStats struct {
 	TMultiKills                [6]int  `json:"-"`
 	TClutchRounds              int     `json:"t_clutch_rounds"`
 	TClutchWins                int     `json:"t_clutch_wins"`
+	TManAdvantageKills         int     `json:"t_man_advantage_kills"`
+	TManAdvantageKillsPct      float64 `json:"t_man_advantage_kills_pct"`
+	TManDisadvantageDeaths     int     `json:"t_man_disadvantage_deaths"`
+	TManDisadvantageDeathsPct  float64 `json:"t_man_disadvantage_deaths_pct"`
 	TRating                    float64 `json:"t_rating"`
 	TEcoRating                 float64 `json:"t_eco_rating"`
 	CTRoundsPlayed             int     `json:"ct_rounds_played"`
@@ -146,6 +154,10 @@ type PlayerStats struct {
 	CTMultiKills               [6]int  `json:"-"`
 	CTClutchRounds             int     `json:"ct_clutch_rounds"`
 	CTClutchWins               int     `json:"ct_clutch_wins"`
+	CTManAdvantageKills        int     `json:"ct_man_advantage_kills"`
+	CTManAdvantageKillsPct     float64 `json:"ct_man_advantage_kills_pct"`
+	CTManDisadvantageDeaths    int     `json:"ct_man_disadvantage_deaths"`
+	CTManDisadvantageDeathsPct float64 `json:"ct_man_disadvantage_deaths_pct"`
 	CTRating                   float64 `json:"ct_rating"`
 	CTEcoRating                float64 `json:"ct_eco_rating"`
 
