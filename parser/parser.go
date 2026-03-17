@@ -220,6 +220,9 @@ func (d *DemoParser) computeDerivedStats() {
 		if p.RoundsPlayed > 0 {
 			rounds := float64(p.RoundsPlayed)
 			p.ProbabilitySwingPerRound = p.ProbabilitySwing / rounds
+			// DuelSwing: EcoKillValue - EcoDeathValue (net duel economy impact)
+			p.DuelSwing = p.EcoKillValue - p.EcoDeathValue
+			p.DuelSwingPerRound = p.DuelSwing / rounds
 			// SwingRating: scale swing to rating (0% = 1.0, +4% = 1.4, -3% = 0.7)
 			p.SwingRating = 1.0 + (p.ProbabilitySwingPerRound * 10.0)
 			if p.SwingRating < 0.5 {

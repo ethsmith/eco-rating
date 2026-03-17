@@ -72,6 +72,8 @@ type PlayerStats struct {
 	EconImpact                 float64 `json:"econ_impact"`
 	EcoKillValue               float64 `json:"eco_kill_value"`
 	EcoDeathValue              float64 `json:"eco_death_value"`
+	DuelSwing                  float64 `json:"duel_swing"`
+	DuelSwingPerRound          float64 `json:"duel_swing_per_round"`
 	ClutchRounds               int     `json:"clutch_rounds"`
 	ClutchWins                 int     `json:"clutch_wins"`
 	SavedByTeammate            int     `json:"saved_by_teammate"`
