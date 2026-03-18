@@ -199,6 +199,60 @@ type AggregatedStats struct {
 	pistolRatingSum            float64
 	mapRatingSum               map[string]float64
 	mapGamesCount              map[string]int
+
+	// ML Pipeline Features (for CS2 Synergy & Role-Gap Engine)
+	SpaceCreationIndex       float64 `json:"space_creation_index"`
+	UncontestedAdvance       float64 `json:"uncontested_advance"`
+	CrosshairDisplacement    int     `json:"crosshair_displacement"`
+	TradeWindowMedian        float64 `json:"trade_window_median"`
+	UtilityEfficiencyScore   float64 `json:"utility_efficiency_score"`
+	ExpectedFlashBlindness   float64 `json:"expected_flash_blindness"`
+	BlindToKillConversion    float64 `json:"blind_to_kill_conversion"`
+	SmokeEffectiveness       float64 `json:"smoke_effectiveness"`
+	SmokesThrown             int     `json:"smokes_thrown"`
+	MolotovDelay             float64 `json:"molotov_delay"`
+	MolotovsThrown           int     `json:"molotovs_thrown"`
+	AnchorHoldTime           float64 `json:"anchor_hold_time"`
+	AnchorRounds             int     `json:"anchor_rounds"`
+	LurkRounds               int     `json:"lurk_rounds"`
+	LurkKills                int     `json:"lurk_kills"`
+	LurkPlants               int     `json:"lurk_plants"`
+	FlankSuccessRate         float64 `json:"flank_success_rate"`
+	InformationDenialRounds  int     `json:"information_denial_rounds"`
+	ClockEfficiency          float64 `json:"clock_efficiency"`
+	AWPBuyRounds             int     `json:"awp_buy_rounds"`
+	AWPUsageRate             float64 `json:"awp_usage_rate"`
+	AWPOpeningDuelAttempts   int     `json:"awp_opening_duel_attempts"`
+	AWPOpeningDuelWins       int     `json:"awp_opening_duel_wins"`
+	AWPOpeningDuelWinRate    float64 `json:"awp_opening_duel_win_rate"`
+	ResourceScore            float64 `json:"resource_score"`
+	DamagePerDollar          float64 `json:"damage_per_dollar"`
+	EconomyEfficiency        float64 `json:"economy_efficiency"`
+	CrossfirePartnerDistance float64 `json:"crossfire_partner_distance"`
+	EntrySpacingSD           float64 `json:"entry_spacing_sd"`
+	EntryAttemptRate         float64 `json:"entry_attempt_rate"`
+	FirstContactRate         float64 `json:"first_contact_rate"`
+	FirstContactRounds       int     `json:"first_contact_rounds"`
+	MidRoundUtilityT         int     `json:"mid_round_utility_t"`
+	MidRoundUtilityCT        int     `json:"mid_round_utility_ct"`
+	MidRoundUtilityUsage     float64 `json:"mid_round_utility_usage"`
+
+	// Accumulators for ML features
+	totalUncontestedAdvance float64
+	tradeWindowSum          float64
+	tradeWindowCount        int
+	flashesWithKill         int
+	effectiveSmokes         int
+	anchorHoldTimeSum       float64
+	anchorHoldTimeCount     int
+	clockEfficiencySum      float64
+	clockEfficiencyCount    int
+	totalEquipmentValue     float64
+	crossfireDistanceSum    float64
+	crossfireDistanceCount  int
+	entrySpacingSum         float64
+	entrySpacingSumSq       float64
+	entrySpacingCount       int
 }
 
 // Aggregator collects and combines player statistics from multiple games.
@@ -350,6 +404,39 @@ func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName stri
 		agg.Survival += p.Survival * rounds
 		agg.KAST += p.KAST * rounds
 		agg.EconImpact += p.EconImpact * rounds
+
+		// ML Pipeline Features accumulation
+		agg.totalUncontestedAdvance += p.TotalUncontestedAdvance
+		agg.CrosshairDisplacement += p.CrosshairDisplacement
+		agg.tradeWindowSum += p.TradeWindowSum
+		agg.tradeWindowCount += p.TradeWindowCount
+		agg.ExpectedFlashBlindness += p.ExpectedFlashBlindness
+		agg.flashesWithKill += p.FlashesWithKill
+		agg.SmokesThrown += p.SmokesThrown
+		agg.effectiveSmokes += p.EffectiveSmokes
+		agg.MolotovDelay += p.MolotovDelay
+		agg.MolotovsThrown += p.MolotovsThrown
+		agg.anchorHoldTimeSum += p.AnchorHoldTimeSum
+		agg.anchorHoldTimeCount += p.AnchorHoldTimeCount
+		agg.AnchorRounds += p.AnchorRounds
+		agg.LurkRounds += p.LurkRounds
+		agg.LurkKills += p.LurkKills
+		agg.LurkPlants += p.LurkPlants
+		agg.InformationDenialRounds += p.InformationDenialRounds
+		agg.clockEfficiencySum += p.ClockEfficiencySum
+		agg.clockEfficiencyCount += p.ClockEfficiencyCount
+		agg.AWPBuyRounds += p.AWPBuyRounds
+		agg.AWPOpeningDuelAttempts += p.AWPOpeningDuelAttempts
+		agg.AWPOpeningDuelWins += p.AWPOpeningDuelWins
+		agg.totalEquipmentValue += p.TotalEquipmentValue
+		agg.crossfireDistanceSum += p.CrossfireDistanceSum
+		agg.crossfireDistanceCount += p.CrossfireDistanceCount
+		agg.entrySpacingSum += p.EntrySpacingSum
+		agg.entrySpacingSumSq += p.EntrySpacingSumSq
+		agg.entrySpacingCount += p.EntrySpacingCount
+		agg.FirstContactRounds += p.FirstContactRounds
+		agg.MidRoundUtilityT += p.MidRoundUtilityT
+		agg.MidRoundUtilityCT += p.MidRoundUtilityCT
 	}
 }
 
@@ -488,7 +575,112 @@ func (a *Aggregator) Finalize() {
 				agg.MapGamesPlayed[mapName] = count
 			}
 		}
+
+		// ML Pipeline Features finalization
+		rounds := float64(agg.RoundsPlayed)
+		if rounds > 0 {
+			// Space Creation Index components
+			agg.UncontestedAdvance = agg.totalUncontestedAdvance / rounds
+			if agg.tradeWindowCount > 0 {
+				agg.TradeWindowMedian = agg.tradeWindowSum / float64(agg.tradeWindowCount)
+			}
+			// SCI calculation
+			advanceNorm := agg.UncontestedAdvance / 500.0
+			if advanceNorm > 1.0 {
+				advanceNorm = 1.0
+			}
+			displacementNorm := float64(agg.CrosshairDisplacement) / rounds / 3.0
+			if displacementNorm > 1.0 {
+				displacementNorm = 1.0
+			}
+			tradeWindowNorm := 0.0
+			if agg.TradeWindowMedian > 0 && agg.TradeWindowMedian < 5.0 {
+				tradeWindowNorm = 1.0 / agg.TradeWindowMedian / 2.0
+				if tradeWindowNorm > 1.0 {
+					tradeWindowNorm = 1.0
+				}
+			}
+			agg.SpaceCreationIndex = 0.4*advanceNorm + 0.35*displacementNorm + 0.25*tradeWindowNorm
+
+			// Utility Efficiency Score components
+			if agg.FlashesThrown > 0 {
+				agg.BlindToKillConversion = float64(agg.flashesWithKill) / float64(agg.FlashesThrown)
+			}
+			if agg.SmokesThrown > 0 {
+				agg.SmokeEffectiveness = float64(agg.effectiveSmokes) / float64(agg.SmokesThrown)
+			}
+			efbNorm := agg.ExpectedFlashBlindness / rounds / 3.0
+			if efbNorm > 1.0 {
+				efbNorm = 1.0
+			}
+			molotovDelayNorm := agg.MolotovDelay / rounds / 5.0
+			if molotovDelayNorm > 1.0 {
+				molotovDelayNorm = 1.0
+			}
+			agg.UtilityEfficiencyScore = 0.3*efbNorm + 0.3*agg.BlindToKillConversion + 0.2*agg.SmokeEffectiveness + 0.2*molotovDelayNorm
+
+			// Anchor Hold Time
+			if agg.anchorHoldTimeCount > 0 {
+				agg.AnchorHoldTime = agg.anchorHoldTimeSum / float64(agg.anchorHoldTimeCount)
+			}
+
+			// Lurk metrics
+			if agg.LurkRounds > 0 {
+				agg.FlankSuccessRate = float64(agg.LurkKills+agg.LurkPlants) / float64(agg.LurkRounds)
+			}
+			if agg.clockEfficiencyCount > 0 {
+				agg.ClockEfficiency = agg.clockEfficiencySum / float64(agg.clockEfficiencyCount)
+			}
+
+			// AWP metrics
+			buyRounds := rounds - float64(agg.PistolRoundsPlayed)
+			if buyRounds > 0 {
+				agg.AWPUsageRate = float64(agg.AWPBuyRounds) / buyRounds
+			}
+			if agg.AWPOpeningDuelAttempts > 0 {
+				agg.AWPOpeningDuelWinRate = float64(agg.AWPOpeningDuelWins) / float64(agg.AWPOpeningDuelAttempts)
+			}
+
+			// Economy efficiency
+			agg.ResourceScore = agg.totalEquipmentValue / rounds
+			if agg.totalEquipmentValue > 0 {
+				agg.DamagePerDollar = float64(agg.Damage) / agg.totalEquipmentValue
+				agg.EconomyEfficiency = agg.DamagePerDollar * 1000.0
+			}
+
+			// Spatial metrics
+			if agg.crossfireDistanceCount > 0 {
+				agg.CrossfirePartnerDistance = agg.crossfireDistanceSum / float64(agg.crossfireDistanceCount)
+			}
+			if agg.entrySpacingCount > 1 {
+				mean := agg.entrySpacingSum / float64(agg.entrySpacingCount)
+				variance := (agg.entrySpacingSumSq / float64(agg.entrySpacingCount)) - (mean * mean)
+				if variance > 0 {
+					agg.EntrySpacingSD = sqrtAgg(variance)
+				}
+			}
+
+			// Entry/First Contact metrics
+			agg.EntryAttemptRate = float64(agg.OpeningAttempts) / rounds
+			agg.FirstContactRate = float64(agg.FirstContactRounds) / rounds
+
+			// Mid-round utility
+			totalMidRound := float64(agg.MidRoundUtilityT + agg.MidRoundUtilityCT)
+			agg.MidRoundUtilityUsage = totalMidRound / rounds
+		}
 	}
+}
+
+// sqrtAgg calculates square root using Newton's method.
+func sqrtAgg(x float64) float64 {
+	if x <= 0 {
+		return 0
+	}
+	z := x
+	for i := 0; i < 10; i++ {
+		z -= (z*z - x) / (2 * z)
+	}
+	return z
 }
 
 // GetResults returns the map of all aggregated player statistics.

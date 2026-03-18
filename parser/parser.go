@@ -254,8 +254,125 @@ func (d *DemoParser) computeDerivedStats() {
 			p.CTManDisadvantageDeathsPct = float64(p.CTManDisadvantageDeaths) / float64(p.CTDeaths)
 		}
 
+		// Compute ML Pipeline derived metrics
+		d.computeMLFeatures(p)
+
 		d.logger.LogPlayerSummary(p.Name, p.Kills, p.Deaths, p.Damage, p.EcoKillValue, p.EcoDeathValue, p.FinalRating)
 	}
+}
+
+// computeMLFeatures calculates ML pipeline features for the CS2 Synergy & Role-Gap Engine.
+func (d *DemoParser) computeMLFeatures(p *model.PlayerStats) {
+	rounds := float64(p.RoundsPlayed)
+	if rounds == 0 {
+		return
+	}
+
+	// Space Creation Index (SCI) components
+	p.UncontestedAdvance = p.TotalUncontestedAdvance / rounds
+	if p.TradeWindowCount > 0 {
+		p.TradeWindowMedian = p.TradeWindowSum / float64(p.TradeWindowCount)
+	}
+	// SCI = 0.4 * Advance + 0.35 * Displacement + 0.25 * (1 / TradeWindow)
+	advanceNorm := p.UncontestedAdvance / 500.0 // Normalize to ~0-1 range (500 units typical max)
+	if advanceNorm > 1.0 {
+		advanceNorm = 1.0
+	}
+	displacementNorm := float64(p.CrosshairDisplacement) / rounds / 3.0 // Normalize per round
+	if displacementNorm > 1.0 {
+		displacementNorm = 1.0
+	}
+	tradeWindowNorm := 0.0
+	if p.TradeWindowMedian > 0 && p.TradeWindowMedian < 5.0 {
+		tradeWindowNorm = 1.0 / p.TradeWindowMedian / 2.0 // Normalize: 0.5s = 1.0, 2s = 0.25
+		if tradeWindowNorm > 1.0 {
+			tradeWindowNorm = 1.0
+		}
+	}
+	p.SpaceCreationIndex = 0.4*advanceNorm + 0.35*displacementNorm + 0.25*tradeWindowNorm
+
+	// Utility Efficiency Score (UES) components
+	if p.FlashesThrown > 0 {
+		p.BlindToKillConversion = float64(p.FlashesWithKill) / float64(p.FlashesThrown)
+	}
+	if p.SmokesThrown > 0 {
+		p.SmokeEffectiveness = float64(p.EffectiveSmokes) / float64(p.SmokesThrown)
+	}
+	// UES = 0.3*EFB + 0.3*BKC + 0.2*SmokeEff + 0.2*MolotovDelay
+	efbNorm := p.ExpectedFlashBlindness / rounds / 3.0 // Normalize per round
+	if efbNorm > 1.0 {
+		efbNorm = 1.0
+	}
+	molotovDelayNorm := p.MolotovDelay / rounds / 5.0 // Normalize per round
+	if molotovDelayNorm > 1.0 {
+		molotovDelayNorm = 1.0
+	}
+	p.UtilityEfficiencyScore = 0.3*efbNorm + 0.3*p.BlindToKillConversion + 0.2*p.SmokeEffectiveness + 0.2*molotovDelayNorm
+
+	// CT Anchor Hold Time (AHT)
+	if p.AnchorHoldTimeCount > 0 {
+		p.AnchorHoldTime = p.AnchorHoldTimeSum / float64(p.AnchorHoldTimeCount)
+	}
+
+	// Lurk & Timing Impact
+	if p.LurkRounds > 0 {
+		p.FlankSuccessRate = float64(p.LurkKills+p.LurkPlants) / float64(p.LurkRounds)
+	}
+	if p.ClockEfficiencyCount > 0 {
+		p.ClockEfficiency = p.ClockEfficiencySum / float64(p.ClockEfficiencyCount)
+	}
+
+	// AWP metrics
+	buyRounds := rounds - float64(p.PistolRoundsPlayed) // Exclude pistol rounds
+	if buyRounds > 0 {
+		p.AWPUsageRate = float64(p.AWPBuyRounds) / buyRounds
+	}
+	if p.AWPOpeningDuelAttempts > 0 {
+		p.AWPOpeningDuelWinRate = float64(p.AWPOpeningDuelWins) / float64(p.AWPOpeningDuelAttempts)
+	}
+
+	// Economy efficiency
+	if rounds > 0 {
+		p.ResourceScore = p.TotalEquipmentValue / rounds
+	}
+	if p.TotalEquipmentValue > 0 {
+		p.DamagePerDollar = float64(p.Damage) / p.TotalEquipmentValue
+		p.EconomyEfficiency = p.DamagePerDollar * 1000.0 // Scale for readability
+	}
+
+	// Spatial metrics
+	if p.CrossfireDistanceCount > 0 {
+		p.CrossfirePartnerDistance = p.CrossfireDistanceSum / float64(p.CrossfireDistanceCount)
+	}
+	if p.EntrySpacingCount > 1 {
+		mean := p.EntrySpacingSum / float64(p.EntrySpacingCount)
+		variance := (p.EntrySpacingSumSq / float64(p.EntrySpacingCount)) - (mean * mean)
+		if variance > 0 {
+			p.EntrySpacingSD = sqrt(variance)
+		}
+	}
+
+	// Entry/First Contact metrics
+	p.EntryAttemptRate = float64(p.OpeningAttempts) / rounds
+	p.FirstContactRate = float64(p.FirstContactRounds) / rounds
+
+	// Mid-round utility (IGL proxy)
+	if p.TRoundsPlayed > 0 || p.CTRoundsPlayed > 0 {
+		totalMidRound := float64(p.MidRoundUtilityT + p.MidRoundUtilityCT)
+		p.MidRoundUtilityUsage = totalMidRound / rounds
+	}
+}
+
+// sqrt calculates square root using Newton's method.
+func sqrt(x float64) float64 {
+	if x <= 0 {
+		return 0
+	}
+	z := x
+	for i := 0; i < 10; i++ {
+		z -= (z*z - x) / (2 * z)
+	}
+	return z
 }
 
 // GetPlayers returns the map of all player statistics keyed by Steam ID.

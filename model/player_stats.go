@@ -203,4 +203,78 @@ type PlayerStats struct {
 	SwingRating              float64               `json:"swing_rating"`                // Swing contribution to final rating
 	RoundBreakdowns          []RoundSwingBreakdown `json:"-"`
 	RatingBreakdown          RatingBreakdown       `json:"-"`
+
+	// ML Pipeline Features (for CS2 Synergy & Role-Gap Engine)
+	// Space Creation Index (SCI) components
+	UncontestedAdvance      float64 `json:"uncontested_advance"`    // Meters traveled into contested zone before first contact
+	TotalUncontestedAdvance float64 `json:"-"`                      // Accumulator for per-round advance
+	CrosshairDisplacement   int     `json:"crosshair_displacement"` // Count of enemy aim vectors displaced >15° toward entry
+	TradeWindowSum          float64 `json:"-"`                      // Sum of trade windows for median calculation
+	TradeWindowCount        int     `json:"-"`                      // Count of trade windows
+	TradeWindowMedian       float64 `json:"trade_window_median"`    // Median trade window (entry death → teammate kill)
+	SpaceCreationIndex      float64 `json:"space_creation_index"`   // Composite SCI score
+
+	// Utility Efficiency Score (UES) components
+	ExpectedFlashBlindness float64 `json:"expected_flash_blindness"` // Sum of predicted blind durations
+	BlindToKillConversion  float64 `json:"blind_to_kill_conversion"` // Fraction of flashes leading to teammate kills
+	FlashesWithKill        int     `json:"-"`                        // Flashes that resulted in teammate kills
+	SmokeEffectiveness     float64 `json:"smoke_effectiveness"`      // Fraction of smokes landing in optimal positions
+	SmokesThrown           int     `json:"smokes_thrown"`            // Total smokes thrown
+	EffectiveSmokes        int     `json:"-"`                        // Smokes landing within 80cm of optimal
+	MolotovDelay           float64 `json:"molotov_delay"`            // Seconds enemies delayed by molotovs
+	MolotovsThrown         int     `json:"molotovs_thrown"`          // Total molotovs/incendiaries thrown
+	UtilityEfficiencyScore float64 `json:"utility_efficiency_score"` // Composite UES score
+
+	// CT Anchor Hold Time (AHT)
+	AnchorHoldTimeSum   float64 `json:"-"`                // Sum of hold times for averaging
+	AnchorHoldTimeCount int     `json:"-"`                // Count of anchor situations
+	AnchorHoldTime      float64 `json:"anchor_hold_time"` // Avg seconds survived after execute utility lands
+	AnchorRounds        int     `json:"anchor_rounds"`    // Rounds where player was site anchor
+
+	// Lurk & Timing Impact
+	LurkRounds              int     `json:"lurk_rounds"`               // Rounds where player was lurking
+	LurkKills               int     `json:"lurk_kills"`                // Kills while lurking
+	LurkPlants              int     `json:"lurk_plants"`               // Bomb plants while lurking
+	FlankSuccessRate        float64 `json:"flank_success_rate"`        // Fraction of lurk rounds with kill/plant
+	InformationDenialRounds int     `json:"information_denial_rounds"` // Rounds where lurk prevented full CT rotate
+	ClockEfficiencySum      float64 `json:"-"`                         // Sum of time remaining at lurk contact
+	ClockEfficiencyCount    int     `json:"-"`                         // Count of lurk contacts
+	ClockEfficiency         float64 `json:"clock_efficiency"`          // Avg time remaining when lurk makes contact
+
+	// AWP-specific metrics for role clustering
+	AWPBuyRounds           int     `json:"awp_buy_rounds"`            // Rounds where player bought AWP
+	AWPUsageRate           float64 `json:"awp_usage_rate"`            // % of buy rounds with AWP
+	AWPOpeningDuelAttempts int     `json:"awp_opening_duel_attempts"` // Opening duels with AWP
+	AWPOpeningDuelWins     int     `json:"awp_opening_duel_wins"`     // Opening duels won with AWP
+	AWPOpeningDuelWinRate  float64 `json:"awp_opening_duel_win_rate"` // Win rate for AWP opening duels
+
+	// Economy efficiency
+	TotalEquipmentValue float64 `json:"-"`                  // Sum of equipment values
+	ResourceScore       float64 `json:"resource_score"`     // Avg equipment value per round
+	DamagePerDollar     float64 `json:"damage_per_dollar"`  // Damage / equipment value
+	EconomyEfficiency   float64 `json:"economy_efficiency"` // Composite economy efficiency
+
+	// Spatial/positioning metrics
+	CrossfirePartnerDistance float64 `json:"crossfire_partner_distance"` // Avg distance to crossfire partner
+	CrossfireDistanceSum     float64 `json:"-"`                          // Sum for averaging
+	CrossfireDistanceCount   int     `json:"-"`                          // Count for averaging
+	EntrySpacingSD           float64 `json:"entry_spacing_sd"`           // SD of distance to entry player
+	EntrySpacingSum          float64 `json:"-"`                          // Sum for SD calculation
+	EntrySpacingSumSq        float64 `json:"-"`                          // Sum of squares for SD
+	EntrySpacingCount        int     `json:"-"`                          // Count for SD
+
+	// Entry/First Contact metrics
+	EntryAttemptRate   float64 `json:"entry_attempt_rate"`   // Fraction of rounds with entry attempt
+	FirstContactRate   float64 `json:"first_contact_rate"`   // Fraction of rounds as first player hit
+	FirstContactRounds int     `json:"first_contact_rounds"` // Rounds where player was first hit
+
+	// Mid-round utility (IGL proxy)
+	MidRoundUtilityT     int     `json:"mid_round_utility_t"`     // Mid-round utility usage on T side
+	MidRoundUtilityCT    int     `json:"mid_round_utility_ct"`    // Mid-round utility usage on CT side
+	MidRoundUtilityUsage float64 `json:"mid_round_utility_usage"` // Combined mid-round utility metric
+
+	// Synergy tracking (for pair-level analysis)
+	CrossfirePairKills map[uint64]int `json:"-"` // Kills with simultaneous LOS on enemy, keyed by partner SteamID
+	FlashKillPairs     map[uint64]int `json:"-"` // Kills within 1.5s of partner's flash, keyed by flasher SteamID
+	FlashedForKills    map[uint64]int `json:"-"` // Flashes that led to partner kills, keyed by killer SteamID
 }

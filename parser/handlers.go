@@ -33,6 +33,7 @@ func (d *DemoParser) registerHandlers() {
 	d.registerDamageHandler()
 	d.registerRoundDecisionHandlers()
 	d.registerRoundEndHandler()
+	d.registerSpatialHandlers()
 }
 
 // addKillSwingContribution records per-event swing contributions for killer and victim.
@@ -76,6 +77,8 @@ func (d *DemoParser) addKillSwingContribution(ctx *killContext, swingResult swin
 func (d *DemoParser) registerMapHandler() {
 	d.parser.RegisterNetMessageHandler(func(m *msg.CSVCMsg_ServerInfo) {
 		d.state.MapName = m.GetMapName()
+		// Initialize spatial analyzer with map-specific zone data
+		d.state.SpatialAnalyzer = NewSpatialAnalyzer(d.state.MapName)
 	})
 }
 
@@ -240,6 +243,22 @@ func (d *DemoParser) registerFlashHandlers() {
 	d.parser.RegisterEventHandler(func(e events.GrenadeProjectileThrow) {
 		d.handleGrenadeThrow(e)
 	})
+
+	d.parser.RegisterEventHandler(func(e events.SmokeStart) {
+		d.handleSmokeStart(e)
+	})
+
+	d.parser.RegisterEventHandler(func(e events.GrenadeProjectileDestroy) {
+		d.handleGrenadeDestroy(e)
+	})
+
+	d.parser.RegisterEventHandler(func(e events.InfernoStart) {
+		d.handleInfernoStart(e)
+	})
+
+	d.parser.RegisterEventHandler(func(e events.InfernoExpired) {
+		d.handleInfernoExpired(e)
+	})
 }
 
 // handlePlayerFlashed processes a player flash event.
@@ -250,10 +269,16 @@ func (d *DemoParser) handlePlayerFlashed(e events.PlayerFlashed) {
 
 	if e.Attacker != nil && e.Player != nil {
 		roundStats := d.state.ensureRound(e.Attacker)
+		playerStats := d.state.ensurePlayer(e.Attacker)
 		flashDuration := e.FlashDuration().Seconds()
+
 		if e.Attacker.Team != e.Player.Team {
 			roundStats.FlashAssists++
 			roundStats.EnemyFlashDuration += flashDuration
+
+			// Track Expected Flash Blindness (EFB) for ML pipeline
+			roundStats.FlashBlindDuration += flashDuration
+			playerStats.ExpectedFlashBlindness += flashDuration
 
 			// Track flash for swing attribution
 			if d.state.SwingTracker != nil {
@@ -266,18 +291,144 @@ func (d *DemoParser) handlePlayerFlashed(e events.PlayerFlashed) {
 	}
 }
 
-// handleGrenadeThrow tracks flash grenade throws.
+// handleGrenadeThrow tracks flash grenade throws and other utility.
 func (d *DemoParser) handleGrenadeThrow(e events.GrenadeProjectileThrow) {
 	if d.state.ShouldSkipEvent() {
 		return
 	}
 
-	if e.Projectile != nil && e.Projectile.Thrower != nil {
-		if e.Projectile.WeaponInstance != nil && e.Projectile.WeaponInstance.Type == common.EqFlash {
-			roundStats := d.state.ensureRound(e.Projectile.Thrower)
+	if e.Projectile != nil && e.Projectile.Thrower != nil && e.Projectile.WeaponInstance != nil {
+		roundStats := d.state.ensureRound(e.Projectile.Thrower)
+		playerStats := d.state.ensurePlayer(e.Projectile.Thrower)
+
+		switch e.Projectile.WeaponInstance.Type {
+		case common.EqFlash:
 			roundStats.FlashesThrown++
+		case common.EqSmoke:
+			roundStats.SmokesThrown++
+			playerStats.SmokesThrown++
+		case common.EqMolotov, common.EqIncendiary:
+			roundStats.MolotovsThrown++
+			playerStats.MolotovsThrown++
+		}
+
+		// Track mid-round utility (after first 20s of round)
+		currentTime := float64(d.parser.CurrentFrame()) / float64(rating.TickRate)
+		timeInRound := currentTime - d.state.RoundStartTime
+		if timeInRound > 20.0 {
+			roundStats.MidRoundUtility++
+			if roundStats.PlayerSide == "T" {
+				playerStats.MidRoundUtilityT++
+			} else if roundStats.PlayerSide == "CT" {
+				playerStats.MidRoundUtilityCT++
+			}
 		}
 	}
+}
+
+// handleSmokeStart tracks smoke grenade detonations for effectiveness scoring.
+func (d *DemoParser) handleSmokeStart(e events.SmokeStart) {
+	if d.state.ShouldSkipEvent() {
+		return
+	}
+
+	// Get smoke position
+	smokePos := model.Position{X: float64(e.Position.X), Y: float64(e.Position.Y), Z: float64(e.Position.Z)}
+
+	// Find the thrower from recent grenade throws
+	gs := d.parser.GameState()
+	participants := gs.Participants().Playing()
+
+	for _, p := range participants {
+		if p.IsBot {
+			continue
+		}
+
+		roundStats := d.state.ensureRound(p)
+		playerStats := d.state.ensurePlayer(p)
+
+		// Check if this player recently threw a smoke (within last few ticks)
+		// This is a heuristic - the event doesn't directly tell us the thrower
+		if roundStats.SmokesThrown > 0 {
+			// Calculate smoke effectiveness using spatial analyzer
+			if d.state.SpatialAnalyzer != nil {
+				throwerSide := roundStats.PlayerSide
+				effectiveness := d.state.SpatialAnalyzer.CalculateSmokeEffectiveness(smokePos, throwerSide)
+
+				if effectiveness >= 0.7 {
+					roundStats.EffectiveSmokes++
+					playerStats.EffectiveSmokes++
+				}
+			}
+			break // Only credit one player
+		}
+	}
+}
+
+// handleGrenadeDestroy tracks grenade destruction events.
+func (d *DemoParser) handleGrenadeDestroy(e events.GrenadeProjectileDestroy) {
+	if d.state.ShouldSkipEvent() {
+		return
+	}
+	// Used for tracking grenade trajectories and positions
+}
+
+// handleInfernoStart tracks molotov/incendiary fire start for delay calculation.
+func (d *DemoParser) handleInfernoStart(e events.InfernoStart) {
+	if d.state.ShouldSkipEvent() {
+		return
+	}
+
+	if e.Inferno == nil {
+		return
+	}
+
+	// Store inferno start time for delay calculation
+	if d.state.ActiveInfernos == nil {
+		d.state.ActiveInfernos = make(map[int64]InfernoInfo)
+	}
+
+	throwerID := uint64(0)
+	if e.Inferno.Thrower() != nil {
+		throwerID = e.Inferno.Thrower().SteamID64
+	}
+
+	currentTime := float64(d.parser.CurrentFrame()) / float64(rating.TickRate)
+	d.state.ActiveInfernos[e.Inferno.UniqueID()] = InfernoInfo{
+		ThrowerID: throwerID,
+		StartTime: currentTime,
+	}
+}
+
+// handleInfernoExpired tracks molotov/incendiary fire end for delay calculation.
+func (d *DemoParser) handleInfernoExpired(e events.InfernoExpired) {
+	if d.state.ShouldSkipEvent() {
+		return
+	}
+
+	if e.Inferno == nil || d.state.ActiveInfernos == nil {
+		return
+	}
+
+	info, exists := d.state.ActiveInfernos[e.Inferno.UniqueID()]
+	if !exists {
+		return
+	}
+
+	currentTime := float64(d.parser.CurrentFrame()) / float64(rating.TickRate)
+	duration := currentTime - info.StartTime
+
+	// Credit the thrower with molotov delay time
+	if info.ThrowerID != 0 {
+		if roundStats, ok := d.state.Round[info.ThrowerID]; ok {
+			roundStats.MolotovDelayTime += duration
+		}
+		if playerStats, ok := d.state.Players[info.ThrowerID]; ok {
+			playerStats.MolotovDelay += duration
+		}
+	}
+
+	delete(d.state.ActiveInfernos, e.Inferno.UniqueID())
 }
 
 // handleFreezetimeEnd processes the end of freeze time, detecting knife rounds
@@ -303,6 +454,11 @@ func (d *DemoParser) handleFreezetimeEnd() {
 
 	d.state.RoundStartTime = float64(d.parser.CurrentFrame()) / float64(rating.TickRate)
 
+	// Reset ML pipeline tracking for new round
+	d.state.RoundFirstContact = false
+	d.state.FirstContactPlayer = 0
+	d.state.ActiveInfernos = make(map[int64]InfernoInfo)
+
 	for _, p := range participants {
 		if p.Team == common.TeamTerrorists {
 			d.state.CurrentSide = "T"
@@ -325,10 +481,38 @@ func (d *DemoParser) handleFreezetimeEnd() {
 		if p.IsBot {
 			continue
 		}
-		d.state.ensurePlayer(p)
+		playerStats := d.state.ensurePlayer(p)
 		roundStats := d.state.ensureRound(p)
 		roundStats.IsPistolRound = d.state.IsPistolRound
-		roundStats.EquipmentValue = float64(p.EquipmentValueCurrent())
+		equipValue := float64(p.EquipmentValueCurrent())
+		roundStats.EquipmentValue = equipValue
+
+		// Track equipment value for economy efficiency
+		playerStats.TotalEquipmentValue += equipValue
+
+		// Track player position at round start for spatial metrics
+		pos := p.Position()
+		roundStats.StartPosition = model.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
+
+		// Check if player has AWP at round start
+		for _, weapon := range p.Weapons() {
+			if weapon.Type == common.EqAWP {
+				roundStats.HadAWPAtStart = true
+				playerStats.AWPBuyRounds++
+				break
+			}
+		}
+
+		// Determine buy round type
+		if d.state.IsPistolRound {
+			roundStats.BuyRoundType = "pistol"
+		} else if equipValue < 2000 {
+			roundStats.BuyRoundType = "eco"
+		} else if equipValue < 3500 {
+			roundStats.BuyRoundType = "force"
+		} else {
+			roundStats.BuyRoundType = "full"
+		}
 
 		if p.Team == common.TeamTerrorists {
 			roundStats.PlayerSide = "T"
@@ -665,15 +849,32 @@ func (d *DemoParser) processOpeningKill(ctx *killContext) {
 	round.EntryFragger = true
 	round.InvolvedInOpening = true
 
+	// Track AWP opening duels for ML pipeline
+	attackerHadAWP := round.HadAWPAtStart
+	victimHadAWP := victimRound.HadAWPAtStart
+
 	if ctx.event.Weapon != nil && ctx.event.Weapon.Type == common.EqAWP {
 		round.AWPOpeningKill = true
 		attacker.AWPOpeningKills++
+	}
+
+	// Track AWP opening duel attempts and wins
+	if attackerHadAWP {
+		attacker.AWPOpeningDuelAttempts++
+		attacker.AWPOpeningDuelWins++
+	}
+	if victimHadAWP {
+		victim.AWPOpeningDuelAttempts++
+		// Victim lost the duel, no win recorded
 	}
 
 	victim.OpeningDeaths++
 	victim.OpeningAttempts++
 	victimRound.OpeningDeath = true
 	victimRound.InvolvedInOpening = true
+
+	// Track trade window for entry player (time until teammate gets trade)
+	// This will be updated in trade detection if a trade occurs
 
 	d.state.RoundHasKill = true
 	d.logger.LogOpeningKill(d.state.RoundNumber, ctx.attacker.Name, ctx.victim.Name)
@@ -830,10 +1031,39 @@ func (d *DemoParser) handlePlayerHurt(e events.PlayerHurt) {
 			}
 		}
 
+		currentTime := float64(d.parser.CurrentFrame()) / float64(rating.TickRate)
+		timeInRound := currentTime - d.state.RoundStartTime
+
+		// Track first contact for ML pipeline
+		if !d.state.RoundFirstContact {
+			d.state.RoundFirstContact = true
+			d.state.FirstContactPlayer = e.Player.SteamID64
+
+			victimStats := d.state.ensurePlayer(e.Player)
+			victimRound := d.state.ensureRound(e.Player)
+
+			victimStats.FirstContactRounds++
+			victimRound.WasFirstContact = true
+			victimRound.FirstContactTime = timeInRound
+			victimRound.ClockTimeAtContact = 115.0 - timeInRound // Round time remaining
+
+			// Record position at first contact
+			pos := e.Player.Position()
+			victimRound.FirstContactPosition = model.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
+
+			// Calculate uncontested advance using spatial analyzer if available
+			if d.state.SpatialAnalyzer != nil {
+				victimRound.UncontestedAdvance = d.state.SpatialAnalyzer.CalculateUncontestedAdvance(
+					victimRound.StartPosition, victimRound.FirstContactPosition, victimRound.PlayerSide)
+			} else {
+				// Fallback to simple distance
+				victimRound.UncontestedAdvance = victimRound.StartPosition.Distance2D(victimRound.FirstContactPosition)
+			}
+			victimStats.TotalUncontestedAdvance += victimRound.UncontestedAdvance
+		}
+
 		// Track damage for swing attribution and TTK calculation
 		if d.state.SwingTracker != nil {
-			currentTime := float64(d.parser.CurrentFrame()) / float64(rating.TickRate)
-			timeInRound := currentTime - d.state.RoundStartTime
 			d.state.SwingTracker.RecordDamage(e.Attacker.SteamID64, e.Player.SteamID64, int(e.HealthDamageTaken), timeInRound)
 		}
 	}
@@ -1141,4 +1371,77 @@ func determineRoundType(roundNumber int) string {
 	}
 
 	return "full"
+}
+
+// registerSpatialHandlers sets up handlers for spatial analysis (crossfire, aim tracking).
+func (d *DemoParser) registerSpatialHandlers() {
+	// Track player positions and view angles periodically for spatial analysis
+	d.parser.RegisterEventHandler(func(e events.FrameDone) {
+		d.handleFrameForSpatial()
+	})
+}
+
+// handleFrameForSpatial processes frame data for spatial analysis.
+// Called every frame to track player positions and view angles.
+func (d *DemoParser) handleFrameForSpatial() {
+	if d.state.ShouldSkipEvent() {
+		return
+	}
+
+	gs := d.parser.GameState()
+	currentTick := d.parser.CurrentFrame()
+
+	// Only process every 16 ticks (about 4 times per second at 64 tick)
+	if currentTick%16 != 0 {
+		return
+	}
+
+	participants := gs.Participants().Playing()
+	for _, p := range participants {
+		if p.IsBot || !p.IsAlive() {
+			continue
+		}
+
+		pos := p.Position()
+		viewAngle := float64(p.ViewDirectionX())
+		modelPos := model.Position{X: pos.X, Y: pos.Y, Z: pos.Z}
+
+		// Update crossfire analyzer
+		if d.state.CrossfireAnalyzer != nil {
+			d.state.CrossfireAnalyzer.UpdatePlayer(p.SteamID64, modelPos, viewAngle, p.Team)
+		}
+
+		// Update aim tracker for crosshair displacement
+		if d.state.AimTracker != nil {
+			if d.state.AimTracker.UpdateAngle(p.SteamID64, viewAngle, currentTick) {
+				// Significant displacement detected
+				playerStats := d.state.ensurePlayer(p)
+				playerStats.CrosshairDisplacement++
+
+				roundStats := d.state.ensureRound(p)
+				roundStats.CrosshairDisplacements++
+			}
+		}
+	}
+}
+
+// processCrossfireAtKill analyzes crossfire positions when a kill occurs.
+func (d *DemoParser) processCrossfireAtKill(ctx *killContext) {
+	if d.state.CrossfireAnalyzer == nil {
+		return
+	}
+
+	// Find crossfire pairs for the attacker's team
+	pairs := d.state.CrossfireAnalyzer.FindCrossfirePairs(ctx.attacker.Team)
+
+	// Check if attacker was in a crossfire position
+	if pair, ok := pairs[ctx.attacker.SteamID64]; ok {
+		attackerStats := d.state.ensurePlayer(ctx.attacker)
+		attackerStats.CrossfireDistanceSum += pair.Distance
+		attackerStats.CrossfireDistanceCount++
+
+		roundStats := d.state.ensureRound(ctx.attacker)
+		roundStats.WasInCrossfire = true
+		roundStats.CrossfirePartnerDistance = pair.Distance
+	}
 }

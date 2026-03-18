@@ -16,6 +16,12 @@ import (
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
 )
 
+// InfernoInfo tracks active molotov/incendiary fires for delay calculation.
+type InfernoInfo struct {
+	ThrowerID uint64
+	StartTime float64
+}
+
 // MatchState holds all state information during demo parsing.
 // It tracks players, current round stats, and various flags for game state.
 type MatchState struct {
@@ -39,15 +45,27 @@ type MatchState struct {
 
 	// Round start state for swing calculation
 	RoundStartState *probability.RoundState
+
+	// ML Pipeline tracking
+	ActiveInfernos     map[int64]InfernoInfo // Active molotov/incendiary fires
+	RoundFirstContact  bool                  // Whether first contact has occurred this round
+	FirstContactPlayer uint64                // SteamID of first player to take damage
+
+	// Spatial analysis
+	SpatialAnalyzer   *SpatialAnalyzer
+	CrossfireAnalyzer *CrossfireAnalyzer
+	AimTracker        *AimTracker
 }
 
 // NewMatchState creates a new MatchState with initialized maps.
 func NewMatchState() *MatchState {
 	return &MatchState{
-		Players:       make(map[uint64]*model.PlayerStats),
-		Round:         make(map[uint64]*model.RoundStats),
-		TradeDetector: NewTradeDetector(),
-		SwingTracker:  NewSwingTracker(),
+		Players:           make(map[uint64]*model.PlayerStats),
+		Round:             make(map[uint64]*model.RoundStats),
+		TradeDetector:     NewTradeDetector(),
+		SwingTracker:      NewSwingTracker(),
+		CrossfireAnalyzer: NewCrossfireAnalyzer(),
+		AimTracker:        NewAimTracker(),
 	}
 }
 
