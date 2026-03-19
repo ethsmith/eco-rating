@@ -9,11 +9,13 @@
 package parser
 
 import (
+	"fmt"
+	"math"
+
 	"github.com/ethsmith/eco-rating/model"
 	"github.com/ethsmith/eco-rating/rating"
 	"github.com/ethsmith/eco-rating/rating/probability"
 	"github.com/ethsmith/eco-rating/rating/swing"
-	"math"
 
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs"
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
@@ -79,6 +81,8 @@ func (d *DemoParser) registerMapHandler() {
 		d.state.MapName = m.GetMapName()
 		// Initialize spatial analyzer with map-specific zone data
 		d.state.SpatialAnalyzer = NewSpatialAnalyzer(d.state.MapName)
+		// Initialize crossfire/flash data tracking
+		d.state.CrossfireFlashData = model.NewCrossfireFlashData(d.state.MapName, "")
 	})
 }
 
@@ -283,6 +287,34 @@ func (d *DemoParser) handlePlayerFlashed(e events.PlayerFlashed) {
 			// Track flash for swing attribution
 			if d.state.SwingTracker != nil {
 				d.state.SwingTracker.RecordFlash(e.Attacker.SteamID64, e.Player.SteamID64, flashDuration)
+			}
+
+			// Track flash for per-round flash-kill analysis
+			if d.state.FlashKillTracker != nil {
+				currentTime := float64(d.parser.CurrentFrame()) / float64(rating.TickRate)
+				timeInRound := currentTime - d.state.RoundStartTime
+
+				flasherPos := e.Attacker.Position()
+				victimPos := e.Player.Position()
+
+				// Get flasher side
+				flasherSide := "T"
+				if e.Attacker.Team == common.TeamCounterTerrorists {
+					flasherSide = "CT"
+				}
+
+				// Use flash position (approximated from projectile if available)
+				flashPos := flasherPos // Default to flasher position
+
+				d.state.FlashKillTracker.RecordFlashDetonate(
+					e.Attacker.SteamID64, e.Attacker.Name,
+					e.Player.SteamID64, e.Player.Name,
+					flashDuration, timeInRound,
+					model.Position{X: flasherPos.X, Y: flasherPos.Y, Z: flasherPos.Z},
+					model.Position{X: flashPos.X, Y: flashPos.Y, Z: flashPos.Z},
+					model.Position{X: victimPos.X, Y: victimPos.Y, Z: victimPos.Z},
+					flasherSide, 0, // entityID not available here
+				)
 			}
 		} else if e.Attacker.SteamID64 != e.Player.SteamID64 {
 			roundStats.TeamFlashCount++
@@ -604,6 +636,7 @@ func (d *DemoParser) handleKill(e events.Kill) {
 	d.processSwingTracking(ctx)
 	d.processEcoKillFlags(ctx)
 	d.processAssist(ctx)
+	d.processCrossfireFlashKill(ctx)
 }
 
 // shouldSkipKill returns true if the kill event should be ignored.
@@ -998,6 +1031,140 @@ func (d *DemoParser) processAssist(ctx *killContext) {
 	assistRound := d.state.ensureRound(ctx.event.Assister)
 	assistRound.GotAssist = true
 	assistRound.Assists++
+}
+
+// processCrossfireFlashKill checks for crossfire and flash-assisted kills and records events.
+func (d *DemoParser) processCrossfireFlashKill(ctx *killContext) {
+	if ctx.attacker == nil || ctx.victim == nil {
+		return
+	}
+
+	// Skip if CrossfireFlashData not initialized
+	if d.state.CrossfireFlashData == nil {
+		return
+	}
+
+	killerPos := ctx.attacker.Position()
+	victimPos := ctx.victim.Position()
+	killerSide := "T"
+	if ctx.attacker.Team == common.TeamCounterTerrorists {
+		killerSide = "CT"
+	}
+
+	// Get zone name for the kill location
+	zone := "Unknown"
+	if d.state.SpatialAnalyzer != nil {
+		zone = d.state.SpatialAnalyzer.GetZoneName(model.Position{X: victimPos.X, Y: victimPos.Y, Z: victimPos.Z})
+	}
+
+	// Check for crossfire kill
+	if d.state.CrossfireAnalyzer != nil {
+		crossfirePairs := d.state.CrossfireAnalyzer.FindCrossfirePairs(ctx.attacker.Team)
+		if pair, ok := crossfirePairs[ctx.attacker.SteamID64]; ok {
+			// Get partner info
+			partnerName := ""
+			gs := d.parser.GameState()
+			for _, p := range gs.Participants().Playing() {
+				if p.SteamID64 == pair.PartnerID {
+					partnerName = p.Name
+					break
+				}
+			}
+
+			event := model.CrossfireEvent{
+				RoundNumber:      d.state.RoundNumber,
+				TimeInRound:      ctx.timeInRound,
+				KillerSteamID:    fmt.Sprintf("%d", ctx.attacker.SteamID64),
+				KillerName:       ctx.attacker.Name,
+				PartnerSteamID:   fmt.Sprintf("%d", pair.PartnerID),
+				PartnerName:      partnerName,
+				VictimSteamID:    fmt.Sprintf("%d", ctx.victim.SteamID64),
+				VictimName:       ctx.victim.Name,
+				KillerPosition:   model.Position{X: killerPos.X, Y: killerPos.Y, Z: killerPos.Z},
+				PartnerPosition:  pair.PartnerPosition,
+				VictimPosition:   model.Position{X: victimPos.X, Y: victimPos.Y, Z: victimPos.Z},
+				CrossfireAngle:   pair.CrossfireAngle,
+				PartnerDistance:  pair.Distance,
+				KillerViewAngle:  pair.KillerViewAngle,
+				PartnerViewAngle: pair.PartnerViewAngle,
+				KillerSide:       killerSide,
+				MapName:          d.state.MapName,
+				Zone:             zone,
+			}
+			d.state.CrossfireFlashData.AddCrossfireEvent(event)
+
+			// Update round stats
+			attackerRound := d.state.ensureRound(ctx.attacker)
+			attackerRound.WasInCrossfire = true
+			attackerRound.CrossfirePartnerDistance = pair.Distance
+
+			// Update player stats for crossfire pair tracking
+			attacker := d.state.ensurePlayer(ctx.attacker)
+			if attacker.CrossfirePairKills == nil {
+				attacker.CrossfirePairKills = make(map[uint64]int)
+			}
+			attacker.CrossfirePairKills[pair.PartnerID]++
+		}
+	}
+
+	// Check for flash-assisted kill
+	if d.state.FlashKillTracker != nil {
+		flashAssist := d.state.FlashKillTracker.GetBestFlashAssist(
+			ctx.victim.SteamID64, ctx.attacker.SteamID64, ctx.timeInRound)
+
+		if flashAssist != nil {
+			event := model.FlashKillEvent{
+				RoundNumber:     d.state.RoundNumber,
+				TimeInRound:     ctx.timeInRound,
+				KillerSteamID:   fmt.Sprintf("%d", ctx.attacker.SteamID64),
+				KillerName:      ctx.attacker.Name,
+				FlasherSteamID:  fmt.Sprintf("%d", flashAssist.FlasherID),
+				FlasherName:     flashAssist.FlasherName,
+				VictimSteamID:   fmt.Sprintf("%d", ctx.victim.SteamID64),
+				VictimName:      ctx.victim.Name,
+				FlashDuration:   flashAssist.FlashDuration,
+				TimeFromFlash:   ctx.timeInRound - flashAssist.TimeInRound,
+				KillerPosition:  model.Position{X: killerPos.X, Y: killerPos.Y, Z: killerPos.Z},
+				FlasherPosition: flashAssist.FlasherPosition,
+				VictimPosition:  model.Position{X: victimPos.X, Y: victimPos.Y, Z: victimPos.Z},
+				FlashPosition:   flashAssist.FlashPosition,
+				KillerSide:      killerSide,
+				MapName:         d.state.MapName,
+				Zone:            zone,
+				WasFullBlind:    IsFullBlind(flashAssist.FlashDuration),
+				WasPopFlash:     flashAssist.WasPopFlash,
+			}
+			d.state.CrossfireFlashData.AddFlashKillEvent(event)
+
+			// Update player stats for flash-kill pair tracking
+			attacker := d.state.ensurePlayer(ctx.attacker)
+			if attacker.FlashKillPairs == nil {
+				attacker.FlashKillPairs = make(map[uint64]int)
+			}
+			attacker.FlashKillPairs[flashAssist.FlasherID]++
+
+			// Update flasher stats
+			if flasherStats, ok := d.state.Players[flashAssist.FlasherID]; ok {
+				if flasherStats.FlashedForKills == nil {
+					flasherStats.FlashedForKills = make(map[uint64]int)
+				}
+				flasherStats.FlashedForKills[ctx.attacker.SteamID64]++
+			}
+
+			// Update round stats for flasher
+			gs := d.parser.GameState()
+			for _, p := range gs.Participants().Playing() {
+				if p.SteamID64 == flashAssist.FlasherID {
+					flasherRound := d.state.ensureRound(p)
+					flasherRound.FlashesLeadingToKills++
+					break
+				}
+			}
+		}
+
+		// Clear victim's flash data
+		d.state.FlashKillTracker.ClearVictimFlashes(ctx.victim.SteamID64)
+	}
 }
 
 // registerDamageHandler sets up the damage event handler.

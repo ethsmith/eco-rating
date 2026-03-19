@@ -45,7 +45,7 @@ func main() {
 	tier := flag.String("tier", "", "Tier to filter demos (challenger, contender, elite, premier, prospect, recruit)")
 	demoPath := flag.String("demo", "", "Path to a single demo file to parse")
 	demoDir := flag.String("demo-dir", "", "Directory for downloaded demos")
-	outputPath := flag.String("output", "stats.csv", "Output path for exported stats (CSV)")
+	outputPath := flag.String("output", "data/stats.csv", "Output path for exported stats (CSV)")
 	flag.Parse()
 
 	cfgPath := *configPath
@@ -65,6 +65,11 @@ func main() {
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	// Ensure data directory exists
+	if err := os.MkdirAll("data", 0755); err != nil {
+		log.Fatalf("Failed to create data directory: %v", err)
 	}
 
 	if *cumulative {
@@ -113,13 +118,14 @@ func main() {
 // ParseResult holds the outcome of parsing a single demo file.
 // It contains player statistics, map information, and any errors encountered.
 type ParseResult struct {
-	DemoKey   string                        // Unique identifier for the demo file
-	Players   map[uint64]*model.PlayerStats // Map of Steam ID to player statistics
-	MapName   string                        // Name of the map played (e.g., de_dust2)
-	Tier      string                        // Competitive tier (e.g., contender, elite)
-	Logs      string                        // Debug/parsing logs if enabled
-	Collector *probability.DataCollector    // Probability data collected from this demo
-	Error     error                         // Any error encountered during parsing
+	DemoKey            string                        // Unique identifier for the demo file
+	Players            map[uint64]*model.PlayerStats // Map of Steam ID to player statistics
+	MapName            string                        // Name of the map played (e.g., de_dust2)
+	Tier               string                        // Competitive tier (e.g., contender, elite)
+	Logs               string                        // Debug/parsing logs if enabled
+	Collector          *probability.DataCollector    // Probability data collected from this demo
+	CrossfireFlashData *model.CrossfireFlashData     // Per-round crossfire and flash event data
+	Error              error                         // Any error encountered during parsing
 }
 
 // downloadedDemo represents a demo file that has been downloaded and extracted.
@@ -138,6 +144,9 @@ func runCumulativeMode(cfg *config.Config, tiers []string, exporter export.Expor
 	dl := downloader.NewDownloader(cfg.DemoDir)
 	aggregator := output.NewAggregator()
 	probCollector := probability.NewDataCollector()
+
+	// Aggregate crossfire/flash data across all prefixes per tier
+	tierCFData := make(map[string]*model.CrossfireFlashData)
 
 	for _, prefix := range cfg.Prefixes {
 		log.Printf("\n=== Processing prefix: %s ===", prefix)
@@ -193,7 +202,7 @@ func runCumulativeMode(cfg *config.Config, tiers []string, exporter export.Expor
 
 			log.Printf("Downloaded %d demos for %s, starting parallel parsing...", len(downloadedDemos), tier)
 
-			successCount, allLogs := parseDemosToAggregator(cfg, downloadedDemos, aggregator, probCollector, aggTier)
+			successCount, allLogs, cfData := parseDemosToAggregator(cfg, downloadedDemos, aggregator, probCollector, aggTier)
 
 			if len(allLogs) > 0 {
 				log.Printf("\n========== PARSING LOGS (%s) ==========", tier)
@@ -203,7 +212,48 @@ func runCumulativeMode(cfg *config.Config, tiers []string, exporter export.Expor
 				log.Printf("========== END LOGS ==========\n")
 			}
 
+			// Merge crossfire/flash data into tier-level aggregation
+			if cfData != nil {
+				if tierCFData[tier] == nil {
+					tierCFData[tier] = model.NewCrossfireFlashData("cumulative", tier)
+				}
+				for _, event := range cfData.CrossfireEvents {
+					tierCFData[tier].AddCrossfireEvent(event)
+				}
+				for _, event := range cfData.FlashKillEvents {
+					tierCFData[tier].AddFlashKillEvent(event)
+				}
+				log.Printf("Aggregated crossfire/flash data for %s: %d crossfire, %d flash-kill events (running total: %d, %d)",
+					tier, len(cfData.CrossfireEvents), len(cfData.FlashKillEvents),
+					len(tierCFData[tier].CrossfireEvents), len(tierCFData[tier].FlashKillEvents))
+			}
+
 			log.Printf("Completed processing %d/%d demos for %s", successCount, len(downloadedDemos), tier)
+		}
+	}
+
+	// Export aggregated crossfire/flash data for each tier after all prefixes are processed
+	for tier, cfData := range tierCFData {
+		if cfData != nil {
+			outputPath := "data/stats" // Default base path
+			if fileExporter, ok := exporter.(*export.FileExportOption); ok {
+				outputPath = fileExporter.OutputPath
+				if strings.HasSuffix(outputPath, ".csv") {
+					outputPath = outputPath[:len(outputPath)-4]
+				}
+			}
+			// Add tier suffix to distinguish between tiers
+			tierOutputPath := outputPath + "_" + tier
+			cfExporter := export.NewCrossfireFlashExporter(tierOutputPath)
+			if err := cfExporter.Export(cfData); err != nil {
+				log.Printf("Warning: Failed to export crossfire/flash data for %s: %v", tier, err)
+			} else {
+				crossfireCount := len(cfData.CrossfireEvents)
+				flashKillCount := len(cfData.FlashKillEvents)
+				if crossfireCount > 0 || flashKillCount > 0 {
+					log.Printf("Crossfire/flash data exported for %s: %d crossfire events, %d flash-kill events", tier, crossfireCount, flashKillCount)
+				}
+			}
 		}
 	}
 
@@ -218,7 +268,7 @@ func runCumulativeMode(cfg *config.Config, tiers []string, exporter export.Expor
 	// Save probability data
 	rounds, kills := probCollector.GetStats()
 	if rounds > 0 {
-		probDataPath := "probability_data.json"
+		probDataPath := "data/probability_data.json"
 		if err := probCollector.SaveToFile(probDataPath); err != nil {
 			log.Printf("Warning: Failed to save probability data: %v", err)
 		} else {
@@ -230,9 +280,9 @@ func runCumulativeMode(cfg *config.Config, tiers []string, exporter export.Expor
 }
 
 // parseDemosToAggregator processes multiple demos in parallel using a worker pool.
-// It returns the count of successfully parsed demos and collected log output.
+// It returns the count of successfully parsed demos, collected log output, and aggregated crossfire/flash data.
 // The number of workers is capped at 8 or the number of CPU cores, whichever is lower.
-func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo, aggregator *output.Aggregator, probCollector *probability.DataCollector, tier string) (int, []string) {
+func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo, aggregator *output.Aggregator, probCollector *probability.DataCollector, tier string) (int, []string, *model.CrossfireFlashData) {
 	numWorkers := runtime.NumCPU()
 	if numWorkers > 8 {
 		numWorkers = 8
@@ -248,7 +298,7 @@ func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				players, mapName, logs, collector, err := parseDemoWithLogs(job.Path, cfg.EnableLogging)
+				players, mapName, logs, collector, cfData, err := parseDemoWithLogs(job.Path, cfg.EnableLogging)
 				// Determine tier from demo filename: team_ prefix = scrim, otherwise = regulation
 				demoTier := tier
 				if strings.Contains(strings.ToLower(job.Key), "team_") {
@@ -257,13 +307,14 @@ func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo
 					demoTier = "regulation"
 				}
 				results <- ParseResult{
-					DemoKey:   job.Key,
-					Players:   players,
-					MapName:   mapName,
-					Tier:      demoTier,
-					Logs:      logs,
-					Collector: collector,
-					Error:     err,
+					DemoKey:            job.Key,
+					Players:            players,
+					MapName:            mapName,
+					Tier:               demoTier,
+					Logs:               logs,
+					Collector:          collector,
+					CrossfireFlashData: cfData,
+					Error:              err,
 				}
 			}
 		}()
@@ -283,6 +334,9 @@ func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo
 	successCount := 0
 	processedCount := 0
 
+	// Aggregate crossfire/flash data across all demos
+	var aggregatedCFData *model.CrossfireFlashData
+
 	for result := range results {
 		processedCount++
 		if result.Error != nil {
@@ -297,6 +351,19 @@ func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo
 			probCollector.Merge(result.Collector)
 		}
 
+		// Merge crossfire/flash data from this demo
+		if result.CrossfireFlashData != nil {
+			if aggregatedCFData == nil {
+				aggregatedCFData = model.NewCrossfireFlashData("cumulative", tier)
+			}
+			for _, event := range result.CrossfireFlashData.CrossfireEvents {
+				aggregatedCFData.AddCrossfireEvent(event)
+			}
+			for _, event := range result.CrossfireFlashData.FlashKillEvents {
+				aggregatedCFData.AddFlashKillEvent(event)
+			}
+		}
+
 		successCount++
 		log.Printf("[%d/%d] Parsed: %s (map: %s, players: %d)", processedCount, len(downloadedDemos), result.DemoKey, result.MapName, len(result.Players))
 
@@ -305,7 +372,7 @@ func parseDemosToAggregator(cfg *config.Config, downloadedDemos []downloadedDemo
 		}
 	}
 
-	return successCount, allLogs
+	return successCount, allLogs, aggregatedCFData
 }
 
 // parseSingleDemo parses a single demo file and exports the results.
@@ -326,22 +393,47 @@ func parseSingleDemo(demoPath string, enableLogging bool, exporter export.Export
 		log.Fatalf("Failed to export stats: %v", err)
 	}
 
+	// Export crossfire/flash data to separate files
+	crossfireFlashData := p.GetCrossfireFlashData()
+	if crossfireFlashData != nil {
+		// Get base output path from the exporter
+		outputPath := "stats" // Default base path
+		if fileExporter, ok := exporter.(*export.FileExportOption); ok {
+			outputPath = fileExporter.OutputPath
+			// Remove .csv extension if present
+			if strings.HasSuffix(outputPath, ".csv") {
+				outputPath = outputPath[:len(outputPath)-4]
+			}
+		}
+
+		cfExporter := export.NewCrossfireFlashExporter(outputPath)
+		if err := cfExporter.Export(crossfireFlashData); err != nil {
+			log.Printf("Warning: Failed to export crossfire/flash data: %v", err)
+		} else {
+			crossfireCount := len(crossfireFlashData.CrossfireEvents)
+			flashKillCount := len(crossfireFlashData.FlashKillEvents)
+			if crossfireCount > 0 || flashKillCount > 0 {
+				log.Printf("Crossfire/flash data exported: %d crossfire events, %d flash-kill events", crossfireCount, flashKillCount)
+			}
+		}
+	}
+
 	log.Printf("Results exported successfully")
 }
 
 // parseDemoWithLogs opens and parses a demo file, returning player stats, map name,
-// log output, probability collector, and any error. This is the core parsing function used by both modes.
-func parseDemoWithLogs(demoPath string, enableLogging bool) (map[uint64]*model.PlayerStats, string, string, *probability.DataCollector, error) {
+// log output, probability collector, crossfire/flash data, and any error. This is the core parsing function used by both modes.
+func parseDemoWithLogs(demoPath string, enableLogging bool) (map[uint64]*model.PlayerStats, string, string, *probability.DataCollector, *model.CrossfireFlashData, error) {
 	demo, err := os.Open(demoPath)
 	if err != nil {
-		return nil, "", "", nil, fmt.Errorf("failed to open demo: %w", err)
+		return nil, "", "", nil, nil, fmt.Errorf("failed to open demo: %w", err)
 	}
 	defer demo.Close()
 
 	p := parser.NewDemoParserWithLogging(demo, enableLogging)
 	if err := p.Parse(); err != nil {
-		return nil, "", "", nil, fmt.Errorf("failed to parse demo: %w", err)
+		return nil, "", "", nil, nil, fmt.Errorf("failed to parse demo: %w", err)
 	}
 
-	return p.GetPlayers(), p.GetMapName(), p.GetLogs(), p.GetCollector(), nil
+	return p.GetPlayers(), p.GetMapName(), p.GetLogs(), p.GetCollector(), p.GetCrossfireFlashData(), nil
 }

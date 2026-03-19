@@ -389,3 +389,14 @@ func (d *DemoParser) GetMapName() string {
 func (d *DemoParser) GetLogs() string {
 	return d.logger.GetOutput()
 }
+
+// GetCrossfireFlashData returns the per-round crossfire and flash event data.
+func (d *DemoParser) GetCrossfireFlashData() *model.CrossfireFlashData {
+	return d.state.CrossfireFlashData
+}
+
+// InitCrossfireFlashData initializes the crossfire/flash data tracking.
+// Call this before parsing if you want to collect per-round crossfire/flash events.
+func (d *DemoParser) InitCrossfireFlashData() {
+	d.state.CrossfireFlashData = model.NewCrossfireFlashData(d.state.MapName, "")
+}

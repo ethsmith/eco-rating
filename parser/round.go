@@ -55,6 +55,10 @@ type MatchState struct {
 	SpatialAnalyzer   *SpatialAnalyzer
 	CrossfireAnalyzer *CrossfireAnalyzer
 	AimTracker        *AimTracker
+
+	// Per-round crossfire and flash tracking
+	FlashKillTracker   *FlashKillTracker
+	CrossfireFlashData *model.CrossfireFlashData
 }
 
 // NewMatchState creates a new MatchState with initialized maps.
@@ -66,6 +70,7 @@ func NewMatchState() *MatchState {
 		SwingTracker:      NewSwingTracker(),
 		CrossfireAnalyzer: NewCrossfireAnalyzer(),
 		AimTracker:        NewAimTracker(),
+		FlashKillTracker:  NewFlashKillTracker(),
 	}
 }
 

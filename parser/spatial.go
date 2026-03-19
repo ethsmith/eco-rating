@@ -11,10 +11,23 @@ import (
 	"github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
 )
 
+// MapCoordinates holds the coordinate transformation data for a map.
+// These values are from cs-demo-manager and used for radar/heatmap positioning.
+// posX/posY are the world coordinates of the top-left corner of the radar image.
+// scale is the units per pixel ratio.
+type MapCoordinates struct {
+	PosX       float64 // X coordinate of radar top-left corner
+	PosY       float64 // Y coordinate of radar top-left corner
+	Scale      float64 // Units per pixel
+	ThresholdZ float64 // Z threshold for multi-level maps (e.g., nuke, vertigo)
+	RadarSize  int     // Radar image size (1024 or 2048)
+}
+
 // MapZones defines spatial zones for each competitive map.
 // Zones are used for uncontested advance calculation and smoke effectiveness.
 type MapZones struct {
 	Name           string
+	Coordinates    MapCoordinates // Radar coordinate system data
 	TSpawn         model.Position
 	CTSpawn        model.Position
 	BombsiteA      ZoneRect
@@ -62,9 +75,10 @@ func (z ZoneRect) Center() model.Position {
 // mapZonesData contains zone definitions for competitive maps.
 var mapZonesData = map[string]*MapZones{
 	"de_dust2": {
-		Name:    "de_dust2",
-		TSpawn:  model.Position{X: -672, Y: 2560, Z: 0},
-		CTSpawn: model.Position{X: 528, Y: -1568, Z: 0},
+		Name:        "de_dust2",
+		Coordinates: MapCoordinates{PosX: -2476, PosY: 3239, Scale: 4.4, ThresholdZ: 0, RadarSize: 1024},
+		TSpawn:      model.Position{X: -672, Y: 2560, Z: 0},
+		CTSpawn:     model.Position{X: 528, Y: -1568, Z: 0},
 		BombsiteA: ZoneRect{
 			Name: "A Site",
 			MinX: 880, MaxX: 1520,
@@ -94,9 +108,10 @@ var mapZonesData = map[string]*MapZones{
 		},
 	},
 	"de_mirage": {
-		Name:    "de_mirage",
-		TSpawn:  model.Position{X: -2976, Y: 816, Z: 0},
-		CTSpawn: model.Position{X: -400, Y: -2400, Z: 0},
+		Name:        "de_mirage",
+		Coordinates: MapCoordinates{PosX: -3230, PosY: 1713, Scale: 5, ThresholdZ: 0, RadarSize: 1024},
+		TSpawn:      model.Position{X: -2976, Y: 816, Z: 0},
+		CTSpawn:     model.Position{X: -400, Y: -2400, Z: 0},
 		BombsiteA: ZoneRect{
 			Name: "A Site",
 			MinX: -1200, MaxX: -400,
@@ -126,9 +141,10 @@ var mapZonesData = map[string]*MapZones{
 		},
 	},
 	"de_inferno": {
-		Name:    "de_inferno",
-		TSpawn:  model.Position{X: -1984, Y: 576, Z: 0},
-		CTSpawn: model.Position{X: 2176, Y: 576, Z: 0},
+		Name:        "de_inferno",
+		Coordinates: MapCoordinates{PosX: -2087, PosY: 3870, Scale: 4.9, ThresholdZ: 0, RadarSize: 1024},
+		TSpawn:      model.Position{X: -1984, Y: 576, Z: 0},
+		CTSpawn:     model.Position{X: 2176, Y: 576, Z: 0},
 		BombsiteA: ZoneRect{
 			Name: "A Site",
 			MinX: 1600, MaxX: 2400,
@@ -156,9 +172,10 @@ var mapZonesData = map[string]*MapZones{
 		},
 	},
 	"de_nuke": {
-		Name:    "de_nuke",
-		TSpawn:  model.Position{X: -1024, Y: -1024, Z: -415},
-		CTSpawn: model.Position{X: 640, Y: -768, Z: -415},
+		Name:        "de_nuke",
+		Coordinates: MapCoordinates{PosX: -3453, PosY: 2887, Scale: 7, ThresholdZ: -495, RadarSize: 1024},
+		TSpawn:      model.Position{X: -1024, Y: -1024, Z: -415},
+		CTSpawn:     model.Position{X: 640, Y: -768, Z: -415},
 		BombsiteA: ZoneRect{
 			Name: "A Site",
 			MinX: 400, MaxX: 1200,
@@ -187,9 +204,10 @@ var mapZonesData = map[string]*MapZones{
 		},
 	},
 	"de_ancient": {
-		Name:    "de_ancient",
-		TSpawn:  model.Position{X: -2400, Y: -400, Z: 0},
-		CTSpawn: model.Position{X: 1200, Y: -400, Z: 0},
+		Name:        "de_ancient",
+		Coordinates: MapCoordinates{PosX: -2953, PosY: 2164, Scale: 5, ThresholdZ: 0, RadarSize: 1024},
+		TSpawn:      model.Position{X: -2400, Y: -400, Z: 0},
+		CTSpawn:     model.Position{X: 1200, Y: -400, Z: 0},
 		BombsiteA: ZoneRect{
 			Name: "A Site",
 			MinX: 800, MaxX: 1600,
@@ -215,9 +233,10 @@ var mapZonesData = map[string]*MapZones{
 		},
 	},
 	"de_anubis": {
-		Name:    "de_anubis",
-		TSpawn:  model.Position{X: -1600, Y: 1200, Z: 0},
-		CTSpawn: model.Position{X: 1200, Y: -800, Z: 0},
+		Name:        "de_anubis",
+		Coordinates: MapCoordinates{PosX: -2796, PosY: 3328, Scale: 5.22, ThresholdZ: 0, RadarSize: 1024},
+		TSpawn:      model.Position{X: -1600, Y: 1200, Z: 0},
+		CTSpawn:     model.Position{X: 1200, Y: -800, Z: 0},
 		BombsiteA: ZoneRect{
 			Name: "A Site",
 			MinX: 800, MaxX: 1600,
@@ -243,9 +262,10 @@ var mapZonesData = map[string]*MapZones{
 		},
 	},
 	"de_vertigo": {
-		Name:    "de_vertigo",
-		TSpawn:  model.Position{X: -1600, Y: -400, Z: 11700},
-		CTSpawn: model.Position{X: -400, Y: 1200, Z: 11700},
+		Name:        "de_vertigo",
+		Coordinates: MapCoordinates{PosX: -3168, PosY: 1762, Scale: 4, ThresholdZ: 11700, RadarSize: 1024},
+		TSpawn:      model.Position{X: -1600, Y: -400, Z: 11700},
+		CTSpawn:     model.Position{X: -400, Y: 1200, Z: 11700},
 		BombsiteA: ZoneRect{
 			Name: "A Site",
 			MinX: -1200, MaxX: -400,
@@ -318,6 +338,34 @@ func (s *SpatialAnalyzer) GetContestedZoneName(pos model.Position) string {
 		}
 	}
 	return ""
+}
+
+// GetZoneName returns the name of any zone containing the position.
+// Checks bombsites, mid, and contested zones in order of priority.
+func (s *SpatialAnalyzer) GetZoneName(pos model.Position) string {
+	if s.mapZones == nil {
+		return "Unknown"
+	}
+	if s.mapZones.BombsiteA.Contains(pos) {
+		return s.mapZones.BombsiteA.Name
+	}
+	if s.mapZones.BombsiteB.Contains(pos) {
+		return s.mapZones.BombsiteB.Name
+	}
+	if s.mapZones.MidZone.Contains(pos) {
+		return s.mapZones.MidZone.Name
+	}
+	for _, zone := range s.mapZones.ContestedZones {
+		if zone.Contains(pos) {
+			return zone.Name
+		}
+	}
+	return "Open"
+}
+
+// GetMapName returns the map name for this analyzer.
+func (s *SpatialAnalyzer) GetMapName() string {
+	return s.mapName
 }
 
 // CalculateUncontestedAdvance calculates the distance traveled before entering a contested zone.
@@ -437,8 +485,25 @@ func (c *CrossfireAnalyzer) FindCrossfirePairs(team common.Team) map[uint64]Cros
 			// Check if they form a crossfire
 			if c.isCrossfire(pos1, pos2, angle1, angle2) {
 				distance := pos1.Distance2D(pos2)
-				pairs[p1] = CrossfirePair{PartnerID: p2, Distance: distance}
-				pairs[p2] = CrossfirePair{PartnerID: p1, Distance: distance}
+				crossfireAngle := math.Abs(angleDiff(angle1, angle2))
+				pairs[p1] = CrossfirePair{
+					PartnerID:        p2,
+					Distance:         distance,
+					CrossfireAngle:   crossfireAngle,
+					KillerPosition:   pos1,
+					PartnerPosition:  pos2,
+					KillerViewAngle:  angle1,
+					PartnerViewAngle: angle2,
+				}
+				pairs[p2] = CrossfirePair{
+					PartnerID:        p1,
+					Distance:         distance,
+					CrossfireAngle:   crossfireAngle,
+					KillerPosition:   pos2,
+					PartnerPosition:  pos1,
+					KillerViewAngle:  angle2,
+					PartnerViewAngle: angle1,
+				}
 			}
 		}
 	}
@@ -448,8 +513,13 @@ func (c *CrossfireAnalyzer) FindCrossfirePairs(team common.Team) map[uint64]Cros
 
 // CrossfirePair represents a crossfire partnership.
 type CrossfirePair struct {
-	PartnerID uint64
-	Distance  float64
+	PartnerID        uint64
+	Distance         float64
+	CrossfireAngle   float64 // Angle between the two players' view directions
+	KillerPosition   model.Position
+	PartnerPosition  model.Position
+	KillerViewAngle  float64
+	PartnerViewAngle float64
 }
 
 // isCrossfire checks if two players are set up in a crossfire position.

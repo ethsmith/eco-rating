@@ -9,6 +9,8 @@
 package output
 
 import (
+	"strings"
+
 	"github.com/ethsmith/eco-rating/model"
 	"github.com/ethsmith/eco-rating/rating"
 )
@@ -281,6 +283,15 @@ func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName stri
 		// Always use Steam ID in key - the tier value differentiates match types
 		key := p.SteamID + ":" + playerTier
 		agg := a.ensurePlayer(key, p.SteamID, p.Name, playerTier)
+		// Name handling depends on match type:
+		// - Scrim (tier starts with "team_" or playerTier is "scrim"): keep first name seen
+		// - Regulation: use name from regulation matches only (won't change)
+		isScrim := strings.HasPrefix(strings.ToLower(tier), "team_") || playerTier == "scrim"
+		if !isScrim && p.Name != "" {
+			// Regulation match: always use the regulation name
+			agg.Name = p.Name
+		}
+		// For scrim, the first name set in ensurePlayer is kept
 		// Update team name to the most recent non-empty value
 		if p.TeamName != "" {
 			agg.Tier = p.TeamName
