@@ -67,32 +67,35 @@ type AggregatedStats struct {
 	EconImpact                 float64        `json:"econ_impact"`
 	EcoKillValue               float64        `json:"eco_kill_value"`
 	EcoDeathValue              float64        `json:"eco_death_value"`
-	ProbabilitySwing           float64        `json:"probability_swing"`
-	ProbabilitySwingPerRound   float64        `json:"probability_swing_per_round"`
-	ClutchRounds               int            `json:"clutch_rounds"`
-	ClutchWins                 int            `json:"clutch_wins"`
-	SavedByTeammate            int            `json:"saved_by_teammate"`
-	SavedTeammate              int            `json:"saved_teammate"`
-	OpeningDeaths              int            `json:"opening_deaths"`
-	OpeningDeathsTraded        int            `json:"opening_deaths_traded"`
-	SupportRounds              int            `json:"support_rounds"`
-	AssistedKills              int            `json:"assisted_kills"`
-	OpeningAttempts            int            `json:"opening_attempts"`
-	OpeningSuccesses           int            `json:"opening_successes"`
-	RoundsWonAfterOpening      int            `json:"rounds_won_after_opening"`
-	AttackRounds               int            `json:"attack_rounds"`
-	Clutch1v1Attempts          int            `json:"clutch_1v1_attempts"`
-	Clutch1v1Wins              int            `json:"clutch_1v1_wins"`
-	TimeAlivePerRound          float64        `json:"time_alive_per_round"`
-	LastAliveRounds            int            `json:"last_alive_rounds"`
-	SavesOnLoss                int            `json:"saves_on_loss"`
-	UtilityDamage              int            `json:"utility_damage"`
-	UtilityKills               int            `json:"utility_kills"`
-	FlashesThrown              int            `json:"flashes_thrown"`
-	FlashAssists               int            `json:"flash_assists"`
-	EnemyFlashDurationPerRound float64        `json:"enemy_flash_duration_per_round"`
-	TeamFlashCount             int            `json:"team_flash_count"`
-	TeamFlashDurationPerRound  float64        `json:"team_flash_duration_per_round"`
+	DuelSwing                  float64        `json:"duel_swing"`
+	DuelSwingPerRound          float64        `json:"duel_swing_per_round"`
+	duelSwingSum               float64
+	ProbabilitySwing           float64 `json:"probability_swing"`
+	ProbabilitySwingPerRound   float64 `json:"probability_swing_per_round"`
+	ClutchRounds               int     `json:"clutch_rounds"`
+	ClutchWins                 int     `json:"clutch_wins"`
+	SavedByTeammate            int     `json:"saved_by_teammate"`
+	SavedTeammate              int     `json:"saved_teammate"`
+	OpeningDeaths              int     `json:"opening_deaths"`
+	OpeningDeathsTraded        int     `json:"opening_deaths_traded"`
+	SupportRounds              int     `json:"support_rounds"`
+	AssistedKills              int     `json:"assisted_kills"`
+	OpeningAttempts            int     `json:"opening_attempts"`
+	OpeningSuccesses           int     `json:"opening_successes"`
+	RoundsWonAfterOpening      int     `json:"rounds_won_after_opening"`
+	AttackRounds               int     `json:"attack_rounds"`
+	Clutch1v1Attempts          int     `json:"clutch_1v1_attempts"`
+	Clutch1v1Wins              int     `json:"clutch_1v1_wins"`
+	TimeAlivePerRound          float64 `json:"time_alive_per_round"`
+	LastAliveRounds            int     `json:"last_alive_rounds"`
+	SavesOnLoss                int     `json:"saves_on_loss"`
+	UtilityDamage              int     `json:"utility_damage"`
+	UtilityKills               int     `json:"utility_kills"`
+	FlashesThrown              int     `json:"flashes_thrown"`
+	FlashAssists               int     `json:"flash_assists"`
+	EnemyFlashDurationPerRound float64 `json:"enemy_flash_duration_per_round"`
+	TeamFlashCount             int     `json:"team_flash_count"`
+	TeamFlashDurationPerRound  float64 `json:"team_flash_duration_per_round"`
 	totalTimeAlive             float64
 	totalEnemyFlashDur         float64
 	totalTeamFlashDur          float64
@@ -261,6 +264,7 @@ func (a *Aggregator) AddGame(players map[uint64]*model.PlayerStats, mapName stri
 		agg.MultiKills.FiveK += p.MultiKillsRaw[5]
 		agg.EcoKillValue += p.EcoKillValue
 		agg.EcoDeathValue += p.EcoDeathValue
+		agg.duelSwingSum += p.DuelSwing
 		agg.ProbabilitySwing += p.ProbabilitySwing
 		agg.ClutchRounds += p.ClutchRounds
 		agg.ClutchWins += p.ClutchWins
@@ -371,6 +375,9 @@ func (a *Aggregator) Finalize() {
 			agg.Survival = agg.Survival / rounds
 			agg.KAST = agg.KAST / rounds
 			agg.EconImpact = agg.EconImpact / rounds
+			// DuelSwing: average across games, DuelSwingPerRound: total swing / total rounds
+			agg.DuelSwing = agg.duelSwingSum / float64(agg.GamesCount)
+			agg.DuelSwingPerRound = (agg.EcoKillValue - agg.EcoDeathValue) / rounds
 			agg.ProbabilitySwingPerRound = agg.ProbabilitySwing / rounds
 
 			// Calculate HLTV rating using centralized function
