@@ -78,13 +78,13 @@ func DefaultTables() *ProbabilityTables {
 	tables.BaseWinProb["2v4_planted"] = 0.467 // 1173 / 2510
 	tables.BaseWinProb["2v3_planted"] = 0.650 // 3520 / 5418
 	tables.BaseWinProb["2v2_planted"] = 0.662 // 5316 / 8034
-	tables.BaseWinProb["2v1_planted"] = 0.499 // 2328 / 4663
+	tables.BaseWinProb["2v1_planted"] = 0.932 // 3787 / 4063
 	tables.BaseWinProb["2v0_planted"] = 0.990 // Forced: all CTs dead + bomb planted (raw 27/27)
 
 	tables.BaseWinProb["1v5_planted"] = 0.052 // 23 / 441
 	tables.BaseWinProb["1v4_planted"] = 0.162 // 214 / 1321
 	tables.BaseWinProb["1v3_planted"] = 0.500 // 1395 / 2789
-	tables.BaseWinProb["1v2_planted"] = 0.932 // 3787 / 4063
+	tables.BaseWinProb["1v2_planted"] = 0.499 // 2328 / 4663
 	tables.BaseWinProb["1v1_planted"] = 0.549 // 825 / 1503
 	tables.BaseWinProb["1v0_planted"] = 0.990 // Forced: all CTs dead + bomb planted (raw 52/52)
 

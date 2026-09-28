@@ -68,6 +68,37 @@ func TestAllocateKillEventExitFragIgnored(t *testing.T) {
 	}
 }
 
+func TestAllocateKillEventPlantedClutchTransitions(t *testing.T) {
+	tests := []struct {
+		name            string
+		tAlive, ctAlive int
+		killerSide      common.Team
+		victimSide      common.Team
+	}{
+		{"T turns 1v2 into 1v1", 1, 2, common.TeamTerrorists, common.TeamCounterTerrorists},
+		{"CT turns 1v2 into 1v1", 2, 1, common.TeamCounterTerrorists, common.TeamTerrorists},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			allocator := NewPoolAllocator(probability.NewDefaultEngine(), DefaultConfig())
+			state := probability.NewRoundState(tt.tAlive, tt.ctAlive, "de_mirage")
+			state.SetBombPlanted()
+			state.TimeRemaining = 40
+			_, result := allocator.AllocateKillEvent(state, KillAllocationInput{
+				Kill: &KillEvent{
+					KillerID: 100, VictimID: 200,
+					KillerSide: tt.killerSide, VictimSide: tt.victimSide,
+					KillerEquip: 4000, VictimEquip: 4000,
+					TotalDamageToVictim: 100, KillerDamageDealt: 100,
+				},
+			})
+			if result.RawSwing <= 0 {
+				t.Fatalf("an enemy kill reducing a planted 1v2 to 1v1 should earn positive swing, got %f", result.RawSwing)
+			}
+		})
+	}
+}
+
 func TestAllocateKillEventHealthReductionRedistributes(t *testing.T) {
 	engine := probability.NewDefaultEngine()
 	cfg := DefaultConfig()
