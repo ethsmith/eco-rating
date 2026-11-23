@@ -17,6 +17,10 @@ type ProbabilityTables struct {
 	// MapAdjustments maps map names to T-side win rate adjustments.
 	// Value is the T-side win percentage (0.0-1.0) for that map.
 	MapAdjustments map[string]float64
+
+	// MapBaseline is the T-side round win rate over all maps. BaseWinProb already carries it, so a
+	// map's factor is its rate relative to this, not to 0.50.
+	MapBaseline float64
 }
 
 // NewProbabilityTables creates a new ProbabilityTables with empty maps.
@@ -25,11 +29,17 @@ func NewProbabilityTables() *ProbabilityTables {
 		BaseWinProb:    make(map[string]float64),
 		DuelWinRates:   make(map[string]float64),
 		MapAdjustments: make(map[string]float64),
+		MapBaseline:    0.50,
 	}
 }
 
 // GetBaseWinProbability returns the T-side win probability for a given state.
-func (t *ProbabilityTables) GetBaseWinProbability(tAlive, ctAlive int, bombPlanted bool) float64 {
+// bombDefused takes precedence: a defused bomb is a CT win (T WP = 0).
+func (t *ProbabilityTables) GetBaseWinProbability(tAlive, ctAlive int, bombPlanted, bombDefused bool) float64 {
+	if bombDefused {
+		return 0.0
+	}
+
 	bombStatus := "none"
 	if bombPlanted {
 		bombStatus = "planted"
@@ -42,6 +52,79 @@ func (t *ProbabilityTables) GetBaseWinProbability(tAlive, ctAlive int, bombPlant
 
 	// Fallback: calculate based on player advantage
 	return t.calculateFallbackProbability(tAlive, ctAlive, bombPlanted)
+}
+
+// EnforceMonotonicity adjusts BaseWinProb so that:
+//   - for fixed T-alive, fewer CTs alive never lowers T-win WP
+//   - for fixed CT-alive, fewer Ts alive never raises T-win WP
+//   - for matching alive counts, planted WP >= none WP
+//
+// Forced endpoints (0 alive on either side) are left unchanged.
+func EnforceMonotonicity(t *ProbabilityTables) {
+	if t == nil || t.BaseWinProb == nil {
+		return
+	}
+
+	for _, status := range []string{"none", "planted"} {
+		get := func(tv, ctv int) float64 {
+			return t.BaseWinProb[stateKeyFromComponents(tv, ctv, status)]
+		}
+		set := func(tv, ctv int, v float64) {
+			t.BaseWinProb[stateKeyFromComponents(tv, ctv, status)] = v
+		}
+
+		// Killing a CT must never lower T-win: for fixed T, WP non-decreasing as CT decreases.
+		for tv := 1; tv <= 5; tv++ {
+			running := get(tv, 5)
+			for ctv := 4; ctv >= 1; ctv-- {
+				v := get(tv, ctv)
+				if v < running {
+					v = running
+					set(tv, ctv, v)
+				}
+				running = v
+			}
+		}
+
+		// Killing a T must never raise T-win: for fixed CT, WP non-increasing as T decreases.
+		for ctv := 1; ctv <= 5; ctv++ {
+			running := get(5, ctv)
+			for tv := 4; tv >= 1; tv-- {
+				v := get(tv, ctv)
+				if v > running {
+					v = running
+					set(tv, ctv, v)
+				}
+				running = v
+			}
+		}
+
+		// Re-apply CT-kill direction after the T-kill pass (constraints can interact).
+		for tv := 1; tv <= 5; tv++ {
+			running := get(tv, 5)
+			for ctv := 4; ctv >= 1; ctv-- {
+				v := get(tv, ctv)
+				if v < running {
+					v = running
+					set(tv, ctv, v)
+				}
+				running = v
+			}
+		}
+	}
+
+	// Planting must never lower T-win for the same alive counts.
+	for tv := 1; tv <= 5; tv++ {
+		for ctv := 1; ctv <= 5; ctv++ {
+			noneKey := stateKeyFromComponents(tv, ctv, "none")
+			plantedKey := stateKeyFromComponents(tv, ctv, "planted")
+			noneProb := t.BaseWinProb[noneKey]
+			plantedProb := t.BaseWinProb[plantedKey]
+			if plantedProb < noneProb {
+				t.BaseWinProb[plantedKey] = noneProb
+			}
+		}
+	}
 }
 
 // calculateFallbackProbability provides a reasonable estimate when no empirical data exists.
@@ -91,12 +174,12 @@ func (t *ProbabilityTables) calculateFallbackDuelRate(attackerEcon, defenderEcon
 	return clamp(0.50+adjustment, 0.20, 0.80)
 }
 
-// GetMapAdjustment returns the T-side win rate for a map (default 0.50).
+// GetMapAdjustment returns the T-side win rate for a map (default MapBaseline, a factor of 1).
 func (t *ProbabilityTables) GetMapAdjustment(mapName string) float64 {
 	if adj, ok := t.MapAdjustments[mapName]; ok {
 		return adj
 	}
-	return 0.50 // Default balanced
+	return t.MapBaseline
 }
 
 // clamp restricts a value to the range [min, max].

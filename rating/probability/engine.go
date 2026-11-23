@@ -1,6 +1,6 @@
 package probability
 
-import "github.com/markus-wa/demoinfocs-golang/v5/pkg/demoinfocs/common"
+import "github.com/csconfederation/fragg-3.0/engine/fact"
 
 // Engine calculates win probabilities based on game state.
 type Engine struct {
@@ -18,7 +18,24 @@ func NewDefaultEngine() *Engine {
 }
 
 // GetWinProbability returns the probability that the specified side wins the round.
-func (e *Engine) GetWinProbability(state *RoundState, side common.Team) float64 {
+func (e *Engine) GetWinProbability(state *RoundState, side fact.Side) float64 {
+	// Decided rounds skip the table and adjustments, which could otherwise put the state after the
+	// last kill below the state before it: a defuse or the last T dying without a plant is a CT win;
+	// the last CT dying is a T win. Ts all dead with the bomb planted is the defuse race, not decided.
+	decided, tWins := false, false
+	switch {
+	case state.BombDefused, state.TAlive == 0 && !state.BombPlanted:
+		decided = true
+	case state.CTAlive == 0:
+		decided, tWins = true, true
+	}
+	if decided {
+		if tWins == (side == fact.SideT) {
+			return 1.0
+		}
+		return 0.0
+	}
+
 	// Get base probability (T-side win rate)
 	tWinProb := e.getBaseProbability(state)
 
@@ -34,7 +51,7 @@ func (e *Engine) GetWinProbability(state *RoundState, side common.Team) float64 
 	// Clamp to valid range
 	tWinProb = clamp(tWinProb, 0.01, 0.99)
 
-	if side == common.TeamTerrorists {
+	if side == fact.SideT {
 		return tWinProb
 	}
 	return 1.0 - tWinProb
@@ -42,7 +59,7 @@ func (e *Engine) GetWinProbability(state *RoundState, side common.Team) float64 
 
 // getBaseProbability returns the T-side win probability from the lookup tables.
 func (e *Engine) getBaseProbability(state *RoundState) float64 {
-	return e.tables.GetBaseWinProbability(state.TAlive, state.CTAlive, state.BombPlanted)
+	return e.tables.GetBaseWinProbability(state.TAlive, state.CTAlive, state.BombPlanted, state.BombDefused)
 }
 
 // applyEconomyAdjustment modifies probability based on economy differential.
@@ -78,9 +95,7 @@ func (e *Engine) applyEconomyAdjustment(baseProb float64, state *RoundState) flo
 func (e *Engine) applyMapAdjustment(baseProb float64, mapName string) float64 {
 	mapTWinRate := e.tables.GetMapAdjustment(mapName)
 
-	// Adjust relative to the default 50% baseline
-	// If map is T-sided (e.g., 0.52), boost T probability slightly
-	mapFactor := mapTWinRate / 0.50
+	mapFactor := mapTWinRate / e.tables.MapBaseline
 
 	return baseProb * mapFactor
 }
@@ -121,8 +136,8 @@ func (e *Engine) CalculateBombPlantSwing(stateBefore *RoundState) float64 {
 	stateAfter := stateBefore.Clone()
 	stateAfter.SetBombPlanted()
 
-	probBefore := e.GetWinProbability(stateBefore, common.TeamTerrorists)
-	probAfter := e.GetWinProbability(stateAfter, common.TeamTerrorists)
+	probBefore := e.GetWinProbability(stateBefore, fact.SideT)
+	probAfter := e.GetWinProbability(stateAfter, fact.SideT)
 
 	return probAfter - probBefore
 }
@@ -132,8 +147,8 @@ func (e *Engine) CalculateBombDefuseSwing(stateBefore *RoundState) float64 {
 	stateAfter := stateBefore.Clone()
 	stateAfter.SetBombDefused()
 
-	probBefore := e.GetWinProbability(stateBefore, common.TeamCounterTerrorists)
-	probAfter := e.GetWinProbability(stateAfter, common.TeamCounterTerrorists)
+	probBefore := e.GetWinProbability(stateBefore, fact.SideCT)
+	probAfter := e.GetWinProbability(stateAfter, fact.SideCT)
 
 	return probAfter - probBefore
 }
