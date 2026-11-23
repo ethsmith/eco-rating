@@ -29,6 +29,9 @@ func rateBuys(m *Match, buys [numBuys]*scope) {
 			switch i {
 			case scopePistol:
 				w.PistolRounds, w.PistolRoundsWon, w.PistolRoundRating = p.Rounds, p.RF, r
+				w.PistolRoundKills, w.PistolRoundDeaths, w.PistolRoundDamage = p.Kills, p.Deaths, p.Damage
+				w.PistolRoundSurvivals = p.Rounds - p.Deaths
+				w.PistolRoundMultiKills = p.TwoK + p.ThreeK + p.FourK + p.FiveK
 			case scopeEco:
 				w.EcoBuyRounds, w.EcoBuyRoundsWon, w.EcoBuyRating = p.Rounds, p.RF, r
 			case scopeForce:

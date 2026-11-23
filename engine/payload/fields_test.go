@@ -157,7 +157,7 @@ func TestFieldList(t *testing.T) {
 	// The marshalled keys, not the reflected ones: encoding/json drops a name found twice at one
 	// depth, so a dropped field fails here.
 	names := listed(t)
-	for scope, n := range map[string]int{"match": 13, "team": 35, "player": 168, "round": 18} {
+	for scope, n := range map[string]int{"match": 13, "team": 35, "player": 180, "round": 18} {
 		if len(names[scope]) != n {
 			t.Errorf("%s has %d fields, want %d", scope, len(names[scope]), n)
 		}
@@ -189,7 +189,7 @@ func TestRowTags(t *testing.T) {
 }
 
 func TestConstants(t *testing.T) {
-	for scope, n := range map[string]int{scopeRoundPlayer: 110, scopeBot: 46, scopeSideT: 10, scopeSideCT: 10,
+	for scope, n := range map[string]int{scopeRoundPlayer: 115, scopeBot: 46, scopeSideT: 10, scopeSideCT: 10,
 		scopeTeamMatch: 7, scopeRound: 4} {
 		if len(constants[scope]) != n {
 			t.Errorf("%s: %d constants, want %d", scope, len(constants[scope]), n)

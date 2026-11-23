@@ -78,6 +78,7 @@ atd	number	float64	player	row.Rates	round-player=0
 avgTimeToDeath	number	float64	player	row.Rates	round-player=0;bot=0;side-T=0;side-CT=0
 avgTimeToKill	number	float64	player	row.Swing	round-player=0;bot=0;side-T=0;side-CT=0
 awpDeaths	number	int	player	row.Combat	round-player=0;bot=0
+awpDeathsNoKill	number	int	player	row.Extra	
 awpKills	number	int	player	row.Combat	
 awpKillsPerRound	number	float64	player	row.Rates	round-player=0;bot=0
 awpMultiKillRounds	number	int	player	row.Combat	round-player=0;bot=0
@@ -110,6 +111,7 @@ ctTeamsWinPoints	number	float64	player	row.Projection	round-player=0
 ctWinPoints	number	float64	player	row.Projection	round-player=0
 ctWinPointsNormalizer	number	int	player	row.Projection	round-player=0
 damage	number	int	player	row.Combat	
+damageInWonRounds	number	int	player	row.Extra	
 damageTaken	number	int	player	row.Combat	
 deathPlacement	number	float64	player	row.Survival	
 deathTick	number	int	player	row.Survival	
@@ -162,9 +164,11 @@ kastRounds	number	float64	player	row.KAST
 killPointAvg	number	float64	player	row.Rates	round-player=0
 killPoints	number	float64	player	row.Objectives	
 kills	number	int	player	row.Combat	
+killsInWonRounds	number	int	player	row.Extra	
 killsVsLowerBuy	number	int	player	row.Economy	round-player=0;bot=0;side-T=0;side-CT=0
 killsVsMuchLowerBuy	number	int	player	row.Economy	round-player=0;bot=0;side-T=0;side-CT=0
 knifeKills	number	int	player	row.Combat	round-player=0;bot=0
+lastAliveRounds	number	int	player	row.Extra	
 lurkRounds	number	int	player	row.Positioning	
 lurkerBlips	number	int	player	row.Positioning	
 manAdvantageKills	number	int	player	row.Openings	round-player=0;bot=0
@@ -179,13 +183,19 @@ ok	number	int	player	row.Openings
 ol	number	int	player	row.Openings	
 openingDeathsTraded	number	int	player	row.Trades	round-player=0;bot=0
 perfectKills	number	int	player	row.Combat	round-player=0;bot=0;side-T=0;side-CT=0
+pistolRoundDamage	number	int	player	row.Buys	round-player=0
+pistolRoundDeaths	number	int	player	row.Buys	round-player=0
+pistolRoundKills	number	int	player	row.Buys	round-player=0
+pistolRoundMultiKills	number	int	player	row.Buys	round-player=0
 pistolRoundRating	number	float64	player	row.Buys	round-player=0
+pistolRoundSurvivals	number	int	player	row.Buys	round-player=0
 pistolRounds	number	int	player	row.Buys	round-player=0
 pistolRoundsWon	number	int	player	row.Buys	round-player=0
 pistolVsRifleKills	number	int	player	row.Combat	round-player=0;bot=0
 rating	number	float64	player	row.Ratings	round-player=0
 rounds	number	int	player	row.ID	round-player=0
 roundsWithAWPKill	number	int	player	row.Combat	round-player=0;bot=0
+roundsWonAfterOpening	number	int	player	row.Extra	
 rwk	number	int	player	row.Openings	
 rws	number	float64	player	row.Objectives	
 savedByTeammate	number	int	player	row.Trades	round-player=0;bot=0
@@ -199,6 +209,8 @@ suppRounds	number	int	player	row.Combat
 swing_rating	number	float64	player	row.Ratings	round-player=0;bot=0
 teamClanName	string	string	player	row.ID	
 teamENUM	number	int	player	row.ID	
+teamFlashCount	number	int	player	row.Extra	
+teamFlashTime	number	float64	player	row.Extra	
 teamsWinPoints	number	float64	player	row.Projection	round-player=0
 threeK	number	int	player	row.Openings	
 ticksAlive	number	int	player	row.Survival	

@@ -20,6 +20,7 @@ type Player struct {
 	Economy
 	Positioning
 	Swing
+	Extra
 	Rates      // fold only
 	Ratings    // fold only
 	Projection // fold only
@@ -262,4 +263,24 @@ type Buys struct {
 	AntiEcoRounds     int     `json:"antiEcoRounds"`
 	AntiEcoRoundsWon  int     `json:"antiEcoRoundsWon"`
 	AntiEcoRating     float64 `json:"antiEcoRating"`
+	// The player's own line over the pistol rounds: kills, deaths, damage, rounds survived and
+	// rounds with two or more kills.
+	PistolRoundKills      int `json:"pistolRoundKills"`
+	PistolRoundDeaths     int `json:"pistolRoundDeaths"`
+	PistolRoundDamage     int `json:"pistolRoundDamage"`
+	PistolRoundSurvivals  int `json:"pistolRoundSurvivals"`
+	PistolRoundMultiKills int `json:"pistolRoundMultiKills"`
+}
+
+// Extra is the stats the pre-v6 eco-rating parser had that CSC-Stats doesn't store, kept for this
+// fork's consumers (calc/extra, a tier 2 calculator: it reads the round and the other families'
+// results). Per round each is 0/1 or the round's amount; the fold sums them like any family.
+type Extra struct {
+	KillsInWonRounds      int     `json:"killsInWonRounds"`      // kills in a round the player's team won
+	DamageInWonRounds     int     `json:"damageInWonRounds"`     // damage in a round the player's team won
+	RoundsWonAfterOpening int     `json:"roundsWonAfterOpening"` // won rounds the player opened with a kill
+	LastAliveRounds       int     `json:"lastAliveRounds"`       // rounds the player ended as the team's last alive
+	TeamFlashCount        int     `json:"teamFlashCount"`        // teammates the player flashed
+	TeamFlashTime         float64 `json:"teamFlashTime"`         // seconds of teammate blindness the player caused
+	AWPDeathsNoKill       int     `json:"awpDeathsNoKill"`       // rounds the player lost an AWP without an AWP kill
 }

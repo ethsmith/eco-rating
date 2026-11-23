@@ -20,7 +20,7 @@ const (
 // were checked against the corpus, and against the code: no collector writes a round-player field
 // listed here.
 var constants = map[string]map[string]any{
-	// 109 fields no collector writes on a round row: the 46 eco-origin fields, the rates, ratings,
+	// 114 fields no collector writes on a round row: the 46 eco-origin fields, the rates, ratings,
 	// projections, whole-only rating inputs and buy-scope fields the fold computes, rounds and wlp.
 	scopeRoundPlayer: with(zeros(ecoOrigin...), zeros(
 		"rounds", "wlp", "utilThrown", "atd", "kast", "killPointAvg", "iiwr", "adr", "drDiff", "KR", "tr",
@@ -34,6 +34,7 @@ var constants = map[string]map[string]any{
 		"pistolRounds", "pistolRoundsWon", "pistolRoundRating", "ecoBuyRounds", "ecoBuyRoundsWon", "ecoBuyRating",
 		"forceBuyRounds", "forceBuyRoundsWon", "forceBuyRating", "fullBuyRounds", "fullBuyRoundsWon", "fullBuyRating",
 		"antiEcoRounds", "antiEcoRoundsWon", "antiEcoRating",
+		"pistolRoundKills", "pistolRoundDeaths", "pistolRoundDamage", "pistolRoundSurvivals", "pistolRoundMultiKills",
 	), map[string]any{"health": 100}),
 	// eco has no bot rows.
 	scopeBot: zeros(ecoOrigin...),

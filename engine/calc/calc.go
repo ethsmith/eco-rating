@@ -9,6 +9,7 @@ import (
 	"github.com/ethsmith/eco-rating/engine/calc/clutches"
 	"github.com/ethsmith/eco-rating/engine/calc/combat"
 	"github.com/ethsmith/eco-rating/engine/calc/economy"
+	"github.com/ethsmith/eco-rating/engine/calc/extra"
 	"github.com/ethsmith/eco-rating/engine/calc/kast"
 	"github.com/ethsmith/eco-rating/engine/calc/objectives"
 	"github.com/ethsmith/eco-rating/engine/calc/openings"
@@ -43,6 +44,7 @@ var All = []Calc{
 	positioning.Calc,
 	swing.Calc,
 	objectives.Finish, // tier 2
+	extra.Calc,        // tier 2: reads combat, openings and objectives
 }
 
 // Run is r's rows: the round's meta, one player row per member, then every calculator.
