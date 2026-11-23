@@ -6,7 +6,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/fact"
 )
 
 // DataCollector collects probability data from demo parsing.

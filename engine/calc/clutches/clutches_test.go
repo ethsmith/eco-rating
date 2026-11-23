@@ -3,11 +3,11 @@ package clutches_test
 import (
 	"testing"
 
-	"github.com/csconfederation/fragg-3.0/engine/calc/clutches"
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/match"
-	"github.com/csconfederation/fragg-3.0/engine/round"
-	"github.com/csconfederation/fragg-3.0/engine/row"
+	"github.com/ethsmith/eco-rating/engine/calc/clutches"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/match"
+	"github.com/ethsmith/eco-rating/engine/round"
+	"github.com/ethsmith/eco-rating/engine/row"
 )
 
 // Players 1-2 T (clan A), 11-12 CT (clan B); 0 is the shared bot row.

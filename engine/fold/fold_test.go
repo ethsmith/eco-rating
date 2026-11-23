@@ -6,9 +6,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/match"
-	"github.com/csconfederation/fragg-3.0/engine/row"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/match"
+	"github.com/ethsmith/eco-rating/engine/row"
 )
 
 // A round of two one-player teams, A on T and B on CT; a wins says whether A did.

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/fact"
 )
 
 type recorder struct {

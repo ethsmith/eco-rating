@@ -3,10 +3,10 @@ package swing
 import (
 	"testing"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/match"
-	"github.com/csconfederation/fragg-3.0/engine/round"
-	"github.com/csconfederation/fragg-3.0/engine/row"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/match"
+	"github.com/ethsmith/eco-rating/engine/round"
+	"github.com/ethsmith/eco-rating/engine/row"
 )
 
 // Two Ts (1, 2) against two CTs (3, 4): T 1 hurts CT 3 for 100 at tick 640 and kills 3 at tick 768

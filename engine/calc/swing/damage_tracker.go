@@ -1,8 +1,8 @@
 package swing
 
 import (
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/rating/swing"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/rating/swing"
 	"maps"
 	"slices"
 )

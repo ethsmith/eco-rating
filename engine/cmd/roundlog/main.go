@@ -24,11 +24,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/ingest"
-	"github.com/csconfederation/fragg-3.0/engine/match"
-	"github.com/csconfederation/fragg-3.0/engine/round"
-	"github.com/csconfederation/fragg-3.0/engine/roundlog"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/ingest"
+	"github.com/ethsmith/eco-rating/engine/match"
+	"github.com/ethsmith/eco-rating/engine/round"
+	"github.com/ethsmith/eco-rating/engine/roundlog"
 )
 
 var matchID = regexp.MustCompile(`mid\d+-\d`)

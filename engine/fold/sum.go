@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/csconfederation/fragg-3.0/engine/row"
+	"github.com/ethsmith/eco-rating/engine/row"
 )
 
 // sum adds src's counters to dst: the integer and float fields of the per-round family structs,

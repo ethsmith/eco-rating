@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/match"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/match"
 )
 
 // Players 1–2 are T (team state 2), 11–13 CT (team state 3).

@@ -8,10 +8,10 @@ package trades
 import (
 	"math"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/round"
-	"github.com/csconfederation/fragg-3.0/engine/row"
-	"github.com/csconfederation/fragg-3.0/rating"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/round"
+	"github.com/ethsmith/eco-rating/engine/row"
+	"github.com/ethsmith/eco-rating/rating"
 )
 
 // eco is the eco row's trade flags and counts for the round.

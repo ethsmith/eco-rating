@@ -3,12 +3,12 @@ package combat_test
 import (
 	"testing"
 
-	"github.com/csconfederation/fragg-3.0/engine/calc"
-	"github.com/csconfederation/fragg-3.0/engine/calc/combat"
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/match"
-	"github.com/csconfederation/fragg-3.0/engine/round"
-	"github.com/csconfederation/fragg-3.0/engine/row"
+	"github.com/ethsmith/eco-rating/engine/calc"
+	"github.com/ethsmith/eco-rating/engine/calc/combat"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/match"
+	"github.com/ethsmith/eco-rating/engine/round"
+	"github.com/ethsmith/eco-rating/engine/row"
 )
 
 // Hand-built rounds: players 1-2 T, 11-13 CT; 0 is the shared bot row.

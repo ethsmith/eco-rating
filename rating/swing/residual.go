@@ -5,7 +5,7 @@ import (
 	"math"
 	"slices"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/fact"
 )
 
 // ResidualInput holds round-end context for residual swing allocation.

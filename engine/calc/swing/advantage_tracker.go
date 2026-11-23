@@ -1,7 +1,7 @@
 package swing
 
 import (
-	"github.com/csconfederation/fragg-3.0/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/fact"
 )
 
 const (

@@ -1,10 +1,10 @@
 package swing
 
 import (
-	"github.com/csconfederation/fragg-3.0/rating/probability"
-	"github.com/csconfederation/fragg-3.0/rating/swing"
+	"github.com/ethsmith/eco-rating/rating/probability"
+	"github.com/ethsmith/eco-rating/rating/swing"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/fact"
 )
 
 // SwingTracker manages round state and swing calculation during parsing.

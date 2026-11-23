@@ -8,13 +8,13 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/csconfederation/fragg-3.0/engine/calc"
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/fold"
-	"github.com/csconfederation/fragg-3.0/engine/ingest"
-	"github.com/csconfederation/fragg-3.0/engine/match"
-	"github.com/csconfederation/fragg-3.0/engine/round"
-	"github.com/csconfederation/fragg-3.0/engine/row"
+	"github.com/ethsmith/eco-rating/engine/calc"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/fold"
+	"github.com/ethsmith/eco-rating/engine/ingest"
+	"github.com/ethsmith/eco-rating/engine/match"
+	"github.com/ethsmith/eco-rating/engine/round"
+	"github.com/ethsmith/eco-rating/engine/row"
 )
 
 // The errors Run returns besides a *match.InvariantError and stream failures. The worker maps them

@@ -1,8 +1,8 @@
 package fold
 
 import (
-	"github.com/csconfederation/fragg-3.0/engine/row"
-	"github.com/csconfederation/fragg-3.0/rating"
+	"github.com/ethsmith/eco-rating/engine/row"
+	"github.com/ethsmith/eco-rating/rating"
 )
 
 // eco computes the eco rates and ratings of one player's rows. The eco sums are the family sums

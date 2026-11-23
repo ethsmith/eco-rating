@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/fact"
 )
 
 // Outcome is what the demo holds.

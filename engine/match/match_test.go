@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/fact"
 )
 
 // sim builds the facts of a two-team match in CS2 dispatch order. Alpha starts T; sides swap after

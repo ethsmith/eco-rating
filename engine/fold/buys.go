@@ -4,7 +4,7 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/csconfederation/fragg-3.0/engine/row"
+	"github.com/ethsmith/eco-rating/engine/row"
 )
 
 // The buy scopes a whole-match row is rated over (Core-planning#589, #590).

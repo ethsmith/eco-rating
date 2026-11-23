@@ -1,6 +1,6 @@
 package row
 
-import "github.com/csconfederation/fragg-3.0/engine/fact"
+import "github.com/ethsmith/eco-rating/engine/fact"
 
 // Round is a committed round: its meta, bomb fields and player rows. The payload lists the player
 // rows itself.

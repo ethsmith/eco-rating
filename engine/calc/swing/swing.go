@@ -7,10 +7,10 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/round"
-	"github.com/csconfederation/fragg-3.0/engine/row"
-	ratingswing "github.com/csconfederation/fragg-3.0/rating/swing"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/round"
+	"github.com/ethsmith/eco-rating/engine/row"
+	ratingswing "github.com/ethsmith/eco-rating/rating/swing"
 )
 
 // A row is a human member's running totals in the round; bots and non-members have none.

@@ -1,6 +1,6 @@
 package probability
 
-import "github.com/csconfederation/fragg-3.0/engine/fact"
+import "github.com/ethsmith/eco-rating/engine/fact"
 
 // Engine calculates win probabilities based on game state.
 type Engine struct {

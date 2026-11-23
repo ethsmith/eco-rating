@@ -1,4 +1,4 @@
-module github.com/csconfederation/fragg-3.0
+module github.com/ethsmith/eco-rating
 
 go 1.27.0
 

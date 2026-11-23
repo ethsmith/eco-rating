@@ -10,8 +10,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/match"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/match"
 )
 
 // Every fact type has a kind, so a type added to engine/fact is stored, or this fails.

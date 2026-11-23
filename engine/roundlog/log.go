@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/match"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/match"
 )
 
 // Version is the fixture format.

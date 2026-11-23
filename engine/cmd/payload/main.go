@@ -11,7 +11,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/csconfederation/fragg-3.0/engine/payload"
+	"github.com/ethsmith/eco-rating/engine/payload"
 )
 
 func main() {

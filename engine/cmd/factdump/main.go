@@ -10,8 +10,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/ingest"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/ingest"
 )
 
 type printer struct{ enc *json.Encoder }

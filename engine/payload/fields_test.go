@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/csconfederation/fragg-3.0/engine/row"
+	"github.com/ethsmith/eco-rating/engine/row"
 )
 
 // fields.tsv lists every JSON field of the payload per scope (match, team, player, round) with its

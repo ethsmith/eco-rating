@@ -1,6 +1,6 @@
 package swing
 
-import "github.com/csconfederation/fragg-3.0/engine/fact"
+import "github.com/ethsmith/eco-rating/engine/fact"
 
 // KillEvent represents a kill during the round.
 type KillEvent struct {

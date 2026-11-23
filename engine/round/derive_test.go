@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/csconfederation/fragg-3.0/engine/roundlog"
+	"github.com/ethsmith/eco-rating/engine/roundlog"
 )
 
 // replay runs a PR 2 fixture through the Deriver, as roundlog does.

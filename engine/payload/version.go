@@ -2,7 +2,7 @@ package payload
 
 import "runtime/debug"
 
-const module = "github.com/csconfederation/fragg-3.0"
+const module = "github.com/ethsmith/eco-rating"
 
 // engineVersion is the fragg build that made the payload (D50). A worker build has fragg as a
 // dependency, so it is the module version, whose pseudo-version carries the commit. fragg's own

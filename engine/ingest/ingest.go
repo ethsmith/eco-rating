@@ -7,7 +7,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/fact"
 
 	dem "github.com/markus-wa/demoinfocs-golang/v6/pkg/demoinfocs"
 	"github.com/markus-wa/demoinfocs-golang/v6/pkg/demoinfocs/common"

@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/csconfederation/fragg-3.0/engine/fact"
-	"github.com/csconfederation/fragg-3.0/engine/match"
-	"github.com/csconfederation/fragg-3.0/engine/round"
+	"github.com/ethsmith/eco-rating/engine/fact"
+	"github.com/ethsmith/eco-rating/engine/match"
+	"github.com/ethsmith/eco-rating/engine/round"
 )
 
 // Status is a short fact sequence for the lifecycle and the stat hook, and what Finish returns for
