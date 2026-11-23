@@ -308,7 +308,8 @@ func TestFinishEdges(t *testing.T) {
 	// Bots share row 0: a bot planter's row gets the +30, and more than five kills the five-kill bonus.
 	r = build(fact.SideT, bomb(fact.BombPlanted{Player: &fact.Player{Steam64: 0, IsBot: true, Side: fact.SideT}}, round.PrePlant), bomb(fact.BombExplode{}, round.PostPlant))
 	out = finish(r, map[uint64]row.Combat{0: {Damage: 10, Kills: 7}})
-	if got, want := out.Players[0].Rws, 70*(10.0/10.0)+30; got != want {
+	const share = 1.0 // the bot row dealt all 10 of its team's damage
+	if got, want := out.Players[0].Rws, 70*share+30; got != want {
 		t.Errorf("bot planter rws %v, want %v", got, want)
 	}
 	if got, want := out.Players[0].ImpactPoints, 0.0+float64(10)/float64(250)+2; got != want {
