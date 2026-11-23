@@ -29,14 +29,17 @@ func TestPerRoundCounters(t *testing.T) {
 		0: {Combat: row.Combat{AWPDeaths: 1}}, // the bot row has no eco stats
 	}}
 	Calc(&round.Round{}, out)
-	if got, want := out.Players[1].Extra, (row.Extra{KillsInWonRounds: 2, DamageInWonRounds: 180, RoundsWonAfterOpening: 1}); got != want {
+	if got, want := out.Players[1].Extra, (row.Extra{KillsInWonRounds: 2, DamageInWonRounds: 180, RoundsWonAfterOpening: 1, AttackRounds: 1}); got != want {
 		t.Errorf("winner with the opening kill: %+v, want %+v", got, want)
 	}
-	if got, want := out.Players[2].Extra, (row.Extra{AWPDeathsNoKill: 1}); got != want {
+	if got, want := out.Players[2].Extra, (row.Extra{AWPDeathsNoKill: 1, AttackRounds: 1}); got != want {
 		t.Errorf("loser who lost an AWP without an AWP kill: %+v, want %+v", got, want)
 	}
 	if got := out.Players[3].AWPDeathsNoKill; got != 0 {
 		t.Errorf("lost an AWP after an AWP kill: awpDeathsNoKill %d, want 0", got)
+	}
+	if got := out.Players[3].AttackRounds; got != 0 {
+		t.Errorf("no damage dealt: attackRounds %d, want 0", got)
 	}
 	if got := out.Players[0].AWPDeathsNoKill; got != 0 {
 		t.Errorf("bot row: awpDeathsNoKill %d, want 0", got)

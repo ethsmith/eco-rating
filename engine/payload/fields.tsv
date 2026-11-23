@@ -75,6 +75,7 @@ antiEcoRoundsWon	number	int	player	row.Buys	round-player=0
 assistedKills	number	int	player	row.Combat	round-player=0;bot=0
 assists	number	int	player	row.Combat	
 atd	number	float64	player	row.Rates	round-player=0
+attackRounds	number	int	player	row.Extra	
 avgTimeToDeath	number	float64	player	row.Rates	round-player=0;bot=0;side-T=0;side-CT=0
 avgTimeToKill	number	float64	player	row.Swing	round-player=0;bot=0;side-T=0;side-CT=0
 awpDeaths	number	int	player	row.Combat	round-player=0;bot=0

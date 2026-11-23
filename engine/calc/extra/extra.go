@@ -25,6 +25,11 @@ func Calc(r *round.Round, out *row.Round) {
 				p.RoundsWonAfterOpening = 1
 			}
 		}
+		// Engaged: dealt any enemy damage this round (combat's damage, utility included). The old
+		// parser's attackRounds was rounds with a kill, a copy of rwk; this is the engagement it named.
+		if p.Damage > 0 {
+			p.AttackRounds = 1
+		}
 		// Died carrying an AWP without an AWP kill this round, by eco's gates as awpDeaths uses
 		// (eco has no bot rows).
 		if id != 0 && p.AWPDeaths > 0 && p.EcoAWPKills == 0 {
