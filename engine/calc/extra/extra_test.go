@@ -98,6 +98,43 @@ func TestLastAliveAtRoundEnd(t *testing.T) {
 	}
 }
 
+func TestPlants(t *testing.T) {
+	t1, t2, t3, ct1 := pl(1, fact.SideT), pl(2, fact.SideT), pl(3, fact.SideT), pl(4, fact.SideCT)
+	players := func() map[uint64]*row.Player {
+		return map[uint64]*row.Player{1: {ID: row.ID{Side: 2}}, 2: {ID: row.ID{Side: 2}}, 3: {ID: row.ID{Side: 2}},
+			4: {ID: row.ID{Side: 3}}, 0: {ID: row.ID{Side: 2}}}
+	}
+
+	// T 3 dies, then T 1 plants with T 1 and 2 alive: every T this round gets the plant and 2 alive,
+	// the dead T 3 included (it is the team's plant); the CT gets neither, nor does the bot row.
+	r := &round.Round{Events: []round.Event{
+		ev(fact.Kill{Killer: &ct1, Victim: &t3}, round.Context{Alive: []fact.Player{t1, t2, ct1}}),
+		ev(fact.BombPlanted{Player: &t1}, round.Context{Before: round.State{Phase: round.PrePlant}, Alive: []fact.Player{t1, t2, ct1}}),
+		ev(fact.Kill{Killer: &ct1, Victim: &t2}, round.Context{Alive: []fact.Player{t1, ct1}}), // after the plant: not counted
+	}, Commit: 3}
+	out := &row.Round{Players: players()}
+	Calc(r, out)
+	for id, want := range map[uint64][2]int{1: {1, 2}, 2: {1, 2}, 3: {1, 2}, 4: {0, 0}, 0: {0, 0}} {
+		if p := out.Players[id]; p.PlantedTRounds != want[0] || p.PostPlantTAlive != want[1] {
+			t.Errorf("player %d: planted %d, post-plant Ts %d; want %d, %d", id, p.PlantedTRounds, p.PostPlantTAlive, want[0], want[1])
+		}
+	}
+
+	// A plant after the round is decided, a dropped plant, and one after the commit don't count.
+	dropped := ev(fact.BombPlanted{Player: &t1}, round.Context{Alive: []fact.Player{t1}})
+	dropped.Dropped = true
+	r = &round.Round{Events: []round.Event{
+		ev(fact.BombPlanted{Player: &t1}, round.Context{Before: round.State{Phase: round.Decided}, Alive: []fact.Player{t1}}),
+		dropped,
+		ev(fact.BombPlanted{Player: &t1}, round.Context{Alive: []fact.Player{t1}}),
+	}, Commit: 2}
+	out = &row.Round{Players: players()}
+	Calc(r, out)
+	if p := out.Players[1]; p.PlantedTRounds != 0 || p.PostPlantTAlive != 0 {
+		t.Errorf("no counting plant: planted %d, post-plant Ts %d; want 0, 0", p.PlantedTRounds, p.PostPlantTAlive)
+	}
+}
+
 func TestLastAliveEdges(t *testing.T) {
 	t1, t2, ct1 := pl(1, fact.SideT), pl(2, fact.SideT), pl(3, fact.SideCT)
 	// Two Ts alive at RoundEnd; one is killed afterwards. Neither ended the round as last alive.

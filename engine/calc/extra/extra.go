@@ -38,6 +38,31 @@ func Calc(r *round.Round, out *row.Round) {
 	}
 	teamFlashes(r, out)
 	lastAlive(r, out)
+	plants(r, out)
+}
+
+// plants credits each player on T this round with the round's plant, if the bomb was planted
+// before the round was decided (objectives' rule), and with the Ts alive just after it: the
+// members alive the plant event leaves, on T. Bots share one row and are skipped.
+func plants(r *round.Round, out *row.Round) {
+	for _, e := range r.Events[:r.Commit] {
+		if _, ok := e.Fact.(fact.BombPlanted); !ok || e.Dropped || e.Before.Phase == round.Decided {
+			continue
+		}
+		tAlive := 0
+		for _, a := range e.Alive {
+			if a.Side == fact.SideT {
+				tAlive++
+			}
+		}
+		for id, p := range out.Players {
+			if id != 0 && p.Side == int(fact.SideT) {
+				p.PlantedTRounds = 1
+				p.PostPlantTAlive = tAlive
+			}
+		}
+		return // one plant a round
+	}
 }
 
 // teamFlashes counts the teammates a player blinded and the blindness, with the filter CSC's

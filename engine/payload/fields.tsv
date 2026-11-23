@@ -193,6 +193,8 @@ pistolRoundSurvivals	number	int	player	row.Buys	round-player=0
 pistolRounds	number	int	player	row.Buys	round-player=0
 pistolRoundsWon	number	int	player	row.Buys	round-player=0
 pistolVsRifleKills	number	int	player	row.Combat	round-player=0;bot=0
+plantedTRounds	number	int	player	row.Extra	
+postPlantTAlive	number	int	player	row.Extra	
 rating	number	float64	player	row.Ratings	round-player=0
 rounds	number	int	player	row.ID	round-player=0
 roundsWithAWPKill	number	int	player	row.Combat	round-player=0;bot=0

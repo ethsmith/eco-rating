@@ -284,4 +284,9 @@ type Extra struct {
 	TeamFlashTime         float64 `json:"teamFlashTime"`         // seconds of teammate blindness the player caused
 	AWPDeathsNoKill       int     `json:"awpDeathsNoKill"`       // rounds the player lost an AWP without an AWP kill
 	AttackRounds          int     `json:"attackRounds"`          // rounds the player dealt enemy damage (engaged), kill or not
+	// The player's T rounds in which their team planted the bomb, and the Ts alive just after each
+	// plant, summed: plantedTRounds / TRounds is the plant rate, postPlantTAlive / plantedTRounds the
+	// average Ts alive in the post-plant.
+	PlantedTRounds  int `json:"plantedTRounds"`
+	PostPlantTAlive int `json:"postPlantTAlive"`
 }
