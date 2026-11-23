@@ -19,7 +19,7 @@ const (
 
 // rateBuys rates every whole-match row over the rounds of each of its team's buys, as a side is
 // rated: the main CSC formula against the scope's own averages.
-func rateBuys(m *Match, buys [numBuys]*scope) {
+func rateBuys(m *Match, buys [numBuys]*scope, tallies map[*row.Player]*tally) {
 	for i, s := range buys {
 		a := average(s.rows)
 		for _, id := range slices.Sorted(maps.Keys(s.rows)) {
@@ -30,7 +30,7 @@ func rateBuys(m *Match, buys [numBuys]*scope) {
 			case scopePistol:
 				w.PistolRounds, w.PistolRoundsWon, w.PistolRoundRating = p.Rounds, p.RF, r
 				w.PistolRoundKills, w.PistolRoundDeaths, w.PistolRoundDamage = p.Kills, p.Deaths, p.Damage
-				w.PistolRoundSurvivals = p.Rounds - p.Deaths
+				w.PistolRoundSurvivals = tallies[p].survived // D44: a disconnect alive isn't a survival
 				w.PistolRoundMultiKills = p.TwoK + p.ThreeK + p.FourK + p.FiveK
 			case scopeEco:
 				w.EcoBuyRounds, w.EcoBuyRoundsWon, w.EcoBuyRating = p.Rounds, p.RF, r

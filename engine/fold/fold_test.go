@@ -104,6 +104,32 @@ func TestBuyScopes(t *testing.T) {
 	}
 }
 
+// The pistol line is the player's own kills, deaths, damage, survivals and multi-kill rounds over
+// the pistol scope's rounds only; a disconnect alive is no survival (D44).
+func TestPistolLine(t *testing.T) {
+	r1, r13, r2 := round(1, row.BuyPistol, row.BuyPistol, true), round(13, row.BuyPistol, row.BuyPistol, false), round(2, row.BuyFull, row.BuyFull, true)
+	r1.Players[1].Kills, r1.Players[1].Damage, r1.Players[1].TwoK = 2, 150, 1
+	r13.Players[1].Kills, r13.Players[1].Deaths, r13.Players[1].Damage = 0, 1, 40
+	r2.Players[1].Kills, r2.Players[1].Damage = 3, 300 // not a pistol round
+	r13.Players[2].Deaths, r13.Players[2].LeftAlive = 0, 1
+	m, err := Fold([]*row.Round{r1, r2, r13})
+	if err != nil {
+		t.Fatal(err)
+	}
+	type line struct{ rounds, won, kills, deaths, damage, survivals, multi int }
+	got := func(p *row.Player) line {
+		return line{p.PistolRounds, p.PistolRoundsWon, p.PistolRoundKills, p.PistolRoundDeaths, p.PistolRoundDamage,
+			p.PistolRoundSurvivals, p.PistolRoundMultiKills}
+	}
+	if l := got(m.Whole[1]); l != (line{2, 1, 2, 1, 190, 1, 1}) {
+		t.Errorf("A %+v", l)
+	}
+	// B died in round 1 and disconnected alive in round 13: no survivals.
+	if l := got(m.Whole[2]); l != (line{2, 1, 0, 1, 0, 0, 0}) {
+		t.Errorf("B %+v", l)
+	}
+}
+
 // The sides split by the round's side, and a row takes its name and team from its latest round.
 func TestSidesAndIdentity(t *testing.T) {
 	r1, r2 := round(1, row.BuyPistol, row.BuyPistol, true), round(2, row.BuyFull, row.BuyFull, false)

@@ -81,7 +81,7 @@ func Fold(rounds []*row.Round) (*Match, error) {
 			s.ImpactRating, s.Rating = cscRating(s, t, p.TTeamsWinPoints, p.TWinPointsNormalizer)
 		}
 	}
-	rateBuys(m, buys)
+	rateBuys(m, buys, tallies)
 	for _, id := range slices.Sorted(maps.Keys(m.Whole)) {
 		m.eco(id, tallies)
 	}
